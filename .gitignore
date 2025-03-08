@@ -37,5 +37,4 @@ ENV/
 Thumbs.db
 
 # Project specific
-alembic/versions/*.py
 !alembic/versions/__init__.py
