@@ -4,18 +4,26 @@ services:
   api:
     build: .
     container_name: lexic-api
-    command: bash -c "while ! nc -z db 5432; do sleep 1; done && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: >
+      bash -c "
+        if [ \"$ENVIRONMENT\" = \"development\" ]; then
+          echo 'Development mode - waiting for local database...'
+          while ! nc -z db 5432; do sleep 1; done
+        else
+          echo 'Production/Staging mode - using external database'
+        fi
+        alembic upgrade head && 
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/lexic_db
+      - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY:-supersecretkey}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-    depends_on:
-      - db
     networks:
       - lexic-network
 
@@ -32,6 +40,8 @@ services:
       - "5432:5432"
     networks:
       - lexic-network
+    profiles:
+      - development
 
   pgadmin:
     image: dpage/pgadmin4
@@ -45,6 +55,8 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=admin
     networks:
       - lexic-network
+    profiles:
+      - development
 
 networks:
   lexic-network:
