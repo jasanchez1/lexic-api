@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -22,32 +23,19 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
+.env
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# OS specific
 .DS_Store
+Thumbs.db
 
-# Environment variables
-.env
-.env.*
-
-# Logs
-*.log
-
-# Database
-*.sqlite3
-*.db
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-
-# Alembic
-alembic/versions/
+# Project specific
+alembic/versions/*.py
+!alembic/versions/__init__.py

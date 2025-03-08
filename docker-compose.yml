@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: lexic-api
+    command: bash -c "while ! nc -z db 5432; do sleep 1; done && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/lexic_db
+      - SECRET_KEY=${SECRET_KEY:-supersecretkey}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - db
+    networks:
+      - lexic-network
+
+  db:
+    image: postgres:15
+    container_name: lexic-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=lexic_db
+    ports:
+      - "5432:5432"
+    networks:
+      - lexic-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: lexic-pgadmin
+    depends_on:
+      - db
+    ports:
+      - "5050:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@lexic.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    networks:
+      - lexic-network
+
+networks:
+  lexic-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

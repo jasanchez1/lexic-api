@@ -1,0 +1,9 @@
+# app/__init__.py
+# app/api/__init__.py
+# app/core/__init__.py
+# app/db/__init__.py
+# app/db/repositories/__init__.py
+# app/models/__init__.py
+# app/schemas/__init__.py
+# app/services/__init__.py
+# tests/__init__.py

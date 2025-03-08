@@ -1,152 +1,103 @@
 # Lexic API
 
-Backend API for the Lexic platform, a service connecting lawyers with potential clients.
+Backend API for Lexic, a platform for connecting with lawyers in Chile.
 
-## Technology Stack
+## Features
 
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- Docker
-- JWT Authentication
+- FastAPI framework with automatic OpenAPI documentation
+- PostgreSQL database with SQLAlchemy ORM
+- Alembic for database migrations
+- JWT authentication with access and refresh tokens
+- Docker and docker-compose for easy development and deployment
 
-## Development Setup
+## Setup
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- Python 3.9+
-- PostgreSQL 14+
+- Python 3.11+ (for local development without Docker)
 
-### Environment Variables
+### Quick Start with Docker
 
-Create a `.env` file in the root directory:
-
-```env
-# Database
-DATABASE_URL=postgresql://postgres:postgres@db:5432/lawyers_db
-
-# JWT
-JWT_SECRET_KEY=your-secret-key-at-least-32-characters
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# CORS
-CORS_ORIGINS=["http://localhost:3000"]
-
-# Environment
-ENV=development
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/lexic-api.git
+cd lexic-api
 ```
 
-### Running with Docker
-
-1. Start the services:
+2. Create a `.env` file from the example:
 ```bash
-docker compose up --build
+cp .env.example .env
 ```
 
-2. Run migrations:
+3. Start the Docker containers:
 ```bash
-docker compose exec api alembic upgrade head
+docker-compose up -d
 ```
 
-The API will be available at `http://localhost:8000`
+4. The API will be available at http://localhost:8000
+5. The OpenAPI documentation will be available at http://localhost:8000/docs
+6. pgAdmin will be available at http://localhost:5050 (login with admin@lexic.com / admin)
 
-### Local Development Setup
+### Database Migrations
 
-1. Create a virtual environment:
+To create and run database migrations:
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-```
+# Enter the API container
+docker-compose exec api bash
 
-2. Install dependencies:
-```bash
-pip install -e .
-```
+# Create a new migration
+alembic revision --autogenerate -m "description of changes"
 
-3. Run migrations:
-```bash
+# Run migrations
 alembic upgrade head
-```
-
-4. Start the development server:
-```bash
-uvicorn src.main:app --reload
 ```
 
 ## API Documentation
 
-Once the server is running, you can access:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+The API documentation is automatically generated and can be accessed at:
 
-## Database Migrations
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
-Create a new migration:
-```bash
-alembic revision --autogenerate -m "description of changes"
-```
+## Development
 
-Apply migrations:
-```bash
-alembic upgrade head
-```
-
-Rollback one migration:
-```bash
-alembic downgrade -1
-```
-
-## Project Structure
+### Project Structure
 
 ```
 lexic-api/
-├── src/
-│   ├── core/           # Core functionality, config, security
+├── app/
+│   ├── api/            # API routes
+│   ├── core/           # Core functionality (config, security)
+│   ├── db/             # Database models and repositories
 │   ├── models/         # SQLAlchemy models
 │   ├── schemas/        # Pydantic schemas
 │   ├── services/       # Business logic
-│   ├── routers/        # API endpoints
-│   └── main.py         # Application entry point
-├── tests/              # Test files
-├── migrations/         # Alembic migrations
-├── docker-compose.yml  # Docker compose configuration
-├── Dockerfile         # Docker build file
-├── requirements.txt   # Python dependencies
-└── pyproject.toml    # Project metadata and dependencies
+│   └── main.py         # FastAPI application
+├── alembic/            # Database migrations
+├── tests/              # Tests
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt
 ```
 
-## Testing
+### Authentication Flow
 
-Run tests:
+1. User signs up or logs in to receive an access token and a refresh token
+2. Access token is used for API requests (short-lived)
+3. Refresh token is used to obtain a new access token when it expires (long-lived)
+
+### Running Tests
+
 ```bash
-pytest
+# Run tests inside the container
+docker-compose exec api pytest
+
+# Run with coverage
+docker-compose exec api pytest --cov=app
 ```
-
-## Production Deployment
-
-1. Set environment variables for production:
-```bash
-ENV=production
-DATABASE_URL=your-production-db-url
-JWT_SECRET_KEY=your-production-secret
-CORS_ORIGINS=["https://your-frontend-domain.com"]
-```
-
-2. Build and run:
-```bash
-docker compose up --build
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a new branch for your feature
-3. Make your changes
-4. Submit a pull request
 
 ## License
 
-[Add your license information here]
+[MIT License](LICENSE)
