@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, health
 from app.core.config import settings
-from app.db.database import create_tables
 
 app = FastAPI(
     title="Lexic API",
@@ -23,8 +22,3 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-
-# Create database tables on startup (for development)
-@app.on_event("startup")
-async def startup_event():
-    create_tables()

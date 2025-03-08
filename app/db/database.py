@@ -36,11 +36,3 @@ def get_db_context() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
-
-def create_tables() -> None:
-    """
-    Create all tables in the database if they don't exist
-    Note: In production, use Alembic for migrations
-    """
-    if settings.ENVIRONMENT == "development":
-        Base.metadata.create_all(bind=engine)
