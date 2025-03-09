@@ -35,7 +35,7 @@ def search_lawyers(
     sort: str = "best_match",
     skip: int = 0,
     limit: int = 100
-) -> Tuple[List[LawyerModel], int]:
+) -> Tuple[List[Dict], int]:
     """
     Search lawyers with various filters
     Returns lawyers and total count
@@ -92,9 +92,58 @@ def search_lawyers(
         base_query = base_query.order_by(asc(LawyerModel.name))
     
     # Apply pagination
-    lawyers = base_query.offset(skip).limit(limit).all()
+    lawyers_db = base_query.offset(skip).limit(limit).all()
     
-    return lawyers, total
+    # Process lawyers to create dictionaries that match the expected format
+    result_lawyers = []
+    
+    for lawyer in lawyers_db:
+        # Get experience scores for each area
+        area_scores = db.query(
+            lawyer_area_association.c.area_id, 
+            lawyer_area_association.c.experience_score
+        ).filter(
+            lawyer_area_association.c.lawyer_id == lawyer.id
+        ).all()
+        
+        # Convert to dict for easy lookup
+        score_map = {str(area_id): score for area_id, score in area_scores}
+        
+        # Transform areas to match LawyerPracticeArea format
+        processed_areas = []
+        for area in lawyer.areas:
+            processed_areas.append({
+                "id": str(area.id),
+                "name": area.name,
+                "slug": area.slug,
+                "experience_score": score_map.get(str(area.id), 0)
+            })
+        
+        # Create a dictionary representation of the lawyer
+        lawyer_dict = {
+            "id": lawyer.id,
+            "user_id": lawyer.user_id,
+            "name": lawyer.name,
+            "title": lawyer.title,
+            "bio": lawyer.bio,
+            "phone": lawyer.phone,
+            "email": lawyer.email,
+            "city": lawyer.city,
+            "image_url": lawyer.image_url,
+            "languages": lawyer.languages,
+            "is_verified": lawyer.is_verified,
+            "professional_start_date": lawyer.professional_start_date,
+            "catchphrase": lawyer.catchphrase,
+            "created_at": lawyer.created_at,
+            "updated_at": lawyer.updated_at,
+            "areas": processed_areas,
+            "review_score": 0.0,  # Default placeholder value
+            "review_count": 0     # Default placeholder value
+        }
+        
+        result_lawyers.append(lawyer_dict)
+    
+    return result_lawyers, total
 
 def create_lawyer(db: Session, lawyer_in: LawyerCreate) -> LawyerModel:
     """

@@ -9,6 +9,8 @@ from app.db.repositories import areas as areas_repository
 from app.schemas.lawyer import Lawyer, LawyerDetail, LawyerCreate, LawyerUpdate, LawyerList
 from app.api.dependencies import get_optional_current_user
 from app.models.user import User
+from app.models.area import lawyer_area_association
+from app.db.repositories.users import get_user_by_id
 
 router = APIRouter()
 
@@ -40,18 +42,19 @@ async def search_lawyers(
     # Calculate total pages
     pages = (total + size - 1) // size  # Ceiling division
     
-    return LawyerList(lawyers=[lawyer for lawyer in lawyers],
-         total=total, 
-         page=page, 
-         size=size, 
-         pages=pages)
+    return LawyerList(
+        lawyers=lawyers,
+        total=total, 
+        page=page, 
+        size=size, 
+        pages=pages
+    )
 
 
 @router.get("/{lawyer_id}", response_model=LawyerDetail)
 async def get_lawyer(
     lawyer_id: UUID, 
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """
     Get a specific lawyer by ID
@@ -59,13 +62,43 @@ async def get_lawyer(
     db_lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
     if db_lawyer is None:
         raise HTTPException(status_code=404, detail="Lawyer not found")
-    return db_lawyer
+    
+    # Process the lawyer's areas to match LawyerPracticeArea format
+    area_scores = db.query(
+        lawyer_area_association.c.area_id, 
+        lawyer_area_association.c.experience_score
+    ).filter(
+        lawyer_area_association.c.lawyer_id == db_lawyer.id
+    ).all()
+    
+    score_map = {str(area_id): score for area_id, score in area_scores}
+    
+    # Create a dictionary for the lawyer
+    lawyer_dict = db_lawyer.__dict__.copy()
+    if "_sa_instance_state" in lawyer_dict:
+        del lawyer_dict["_sa_instance_state"]
+    
+    # Process areas
+    processed_areas = []
+    for area in db_lawyer.areas:
+        processed_areas.append({
+            "id": str(area.id),
+            "name": area.name,
+            "slug": area.slug,
+            "experience_score": score_map.get(str(area.id), 0)
+        })
+    
+    lawyer_dict["areas"] = processed_areas
+    lawyer_dict["review_score"] = 0.0  # Default value
+    lawyer_dict["review_count"] = 0    # Default value
+    
+    return lawyer_dict
+
 
 @router.post("/", response_model=Lawyer, status_code=status.HTTP_201_CREATED)
 async def create_lawyer(
     lawyer: LawyerCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_optional_current_user)
 ):
     """
     Create a new lawyer profile
@@ -89,25 +122,59 @@ async def create_lawyer(
                 )
     
     # Associate with current user if authenticated
-    if current_user:
-        lawyer.user_id = current_user.id
-        
-        # Check if current user already has a lawyer profile
-        existing_profile = lawyers_repository.get_lawyer_by_user_id(db, current_user.id)
-        if existing_profile:
-            raise HTTPException(
-                status_code=400,
-                detail="Current user already has a lawyer profile"
-            )
+    user = get_user_by_id(db, lawyer.user_id) if lawyer.user_id else None
     
-    return lawyers_repository.create_lawyer(db, lawyer)
+    if lawyer.user_id and not user:
+        raise HTTPException(
+            status_code=400,
+            detail="User with this ID not found"
+        )
+    
+    # Check if current user already has a lawyer profile
+    if lawyer.user_id and lawyers_repository.get_lawyer_by_user_id(db, lawyer.user_id):
+        raise HTTPException(
+            status_code=400,
+            detail="User already has a lawyer profile"
+        )
+        
+    db_lawyer = lawyers_repository.create_lawyer(db, lawyer)
+    
+    # Process the lawyer's areas to match LawyerPracticeArea format
+    area_scores = db.query(
+        lawyer_area_association.c.area_id, 
+        lawyer_area_association.c.experience_score
+    ).filter(
+        lawyer_area_association.c.lawyer_id == db_lawyer.id
+    ).all()
+    
+    score_map = {str(area_id): score for area_id, score in area_scores}
+    
+    # Create a dictionary for the lawyer
+    lawyer_dict = db_lawyer.__dict__.copy()
+    if "_sa_instance_state" in lawyer_dict:
+        del lawyer_dict["_sa_instance_state"]
+    
+    # Process areas
+    processed_areas = []
+    for area in db_lawyer.areas:
+        processed_areas.append({
+            "id": str(area.id),
+            "name": area.name,
+            "slug": area.slug,
+            "experience_score": score_map.get(str(area.id), 0)
+        })
+    
+    lawyer_dict["areas"] = processed_areas
+    lawyer_dict["review_score"] = 0.0  # Default value
+    lawyer_dict["review_count"] = 0    # Default value
+    
+    return lawyer_dict
 
 @router.patch("/{lawyer_id}", response_model=Lawyer)
 async def update_lawyer(
     lawyer_id: UUID,
     lawyer: LawyerUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_optional_current_user)
 ):
     """
     Update a lawyer profile
@@ -115,17 +182,6 @@ async def update_lawyer(
     db_lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
     if db_lawyer is None:
         raise HTTPException(status_code=404, detail="Lawyer not found")
-    
-    # Check if user is authorized to update this lawyer
-    # Only the linked user or an admin can update a lawyer profile
-    if current_user and (current_user.id == db_lawyer.user_id):
-        # Authorized
-        pass
-    else:
-        raise HTTPException(
-            status_code=403,
-            detail="Not authorized to update this lawyer profile"
-        )
     
     # Check if areas exist if provided
     if lawyer.areas:
@@ -146,13 +202,43 @@ async def update_lawyer(
                 detail="Lawyer with this email already exists"
             )
     
-    return lawyers_repository.update_lawyer(db, db_lawyer, lawyer)
+    updated_lawyer = lawyers_repository.update_lawyer(db, db_lawyer, lawyer)
+    
+    # Process the lawyer's areas to match LawyerPracticeArea format
+    area_scores = db.query(
+        lawyer_area_association.c.area_id, 
+        lawyer_area_association.c.experience_score
+    ).filter(
+        lawyer_area_association.c.lawyer_id == updated_lawyer.id
+    ).all()
+    
+    score_map = {str(area_id): score for area_id, score in area_scores}
+    
+    # Create a dictionary for the lawyer
+    lawyer_dict = updated_lawyer.__dict__.copy()
+    if "_sa_instance_state" in lawyer_dict:
+        del lawyer_dict["_sa_instance_state"]
+    
+    # Process areas
+    processed_areas = []
+    for area in updated_lawyer.areas:
+        processed_areas.append({
+            "id": str(area.id),
+            "name": area.name,
+            "slug": area.slug,
+            "experience_score": score_map.get(str(area.id), 0)
+        })
+    
+    lawyer_dict["areas"] = processed_areas
+    lawyer_dict["review_score"] = 0.0  # Default value
+    lawyer_dict["review_count"] = 0    # Default value
+    
+    return lawyer_dict
 
 @router.delete("/{lawyer_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lawyer(
     lawyer_id: UUID, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_optional_current_user)
 ):
     """
     Delete a lawyer profile
@@ -160,17 +246,6 @@ async def delete_lawyer(
     db_lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
     if db_lawyer is None:
         raise HTTPException(status_code=404, detail="Lawyer not found")
-    
-    # Check if user is authorized to delete this lawyer
-    # Only the linked user or an admin can delete a lawyer profile
-    if current_user and (current_user.id == db_lawyer.user_id):
-        # Authorized
-        pass
-    else:
-        raise HTTPException(
-            status_code=403,
-            detail="Not authorized to delete this lawyer profile"
-        )
     
     lawyers_repository.delete_lawyer(db, lawyer_id)
     return None

@@ -11,41 +11,6 @@ from app.schemas.area import PracticeArea
 
 router = APIRouter()
 
-@router.get("/", response_model=List[PracticeAreaCategory])
-async def get_practice_area_categories(
-    db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100
-):
-    """
-    Retrieve all practice area categories
-    """
-    return categories_repository.get_categories(db, skip, limit)
-
-@router.get("/with-areas", response_model=List[PracticeAreaCategoryWithAreas])
-async def get_categories_with_areas(db: Session = Depends(get_db)):
-    """
-    Retrieve all categories with their practice areas
-    """
-    categories = categories_repository.get_categories(db)
-    result = []
-    
-    for category in categories:
-        # Get all areas for this category
-        areas = areas_repository.get_areas(db, category_id=category.id, limit=1000)
-        
-        # Convert to Pydantic model
-        category_with_areas = PracticeAreaCategoryWithAreas(
-            id=category.id,
-            name=category.name,
-            slug=category.slug,
-            areas=areas
-        )
-        
-        result.append(category_with_areas)
-    
-    return result
-
 @router.get("/{category_id}", response_model=PracticeAreaCategory)
 async def get_practice_area_category(category_id: UUID, db: Session = Depends(get_db)):
     """
