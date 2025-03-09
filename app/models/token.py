@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
@@ -17,7 +17,7 @@ class Token(Base):
     type = Column(String, nullable=False)  # 'refresh', 'verification', 'password_reset'
     expires_at = Column(DateTime, nullable=False)
     is_revoked = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now(tz=UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
-    # Relationship to User
-    user = relationship("User", backref="tokens")
+    # Relationship to User - using string to avoid circular import
+    user = relationship("app.models.user.User", backref="tokens")

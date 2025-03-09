@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -58,6 +58,6 @@ def delete_expired_tokens(db: Session) -> int:
     """
     Delete all expired tokens
     """
-    result = db.query(Token).filter(Token.expires_at < datetime.now(tz=UTC)).delete()
+    result = db.query(Token).filter(Token.expires_at < datetime.now(timezone.utc)).delete()
     db.commit()
     return result

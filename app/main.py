@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, health
+from app.api import auth, health, areas, lawyers, categories
 from app.core.config import settings
 
 app = FastAPI(
@@ -22,3 +22,6 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(areas.router, prefix="/areas", tags=["areas"])
+app.include_router(categories.router, prefix="/categories", tags=["categories"])
+app.include_router(lawyers.router, prefix="/lawyers", tags=["lawyers"])

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -111,7 +111,7 @@ def create_tokens_for_user(db: Session, user: User) -> TokenResponse:
     refresh_token, jti = create_refresh_token(subject=user.id)
     
     # Store refresh token in database
-    refresh_token_expires = datetime.now(tz=UTC) + timedelta(days=7)
+    refresh_token_expires = datetime.now(tz=timezone.utc) + timedelta(days=7)
     create_token(
         db=db,
         user_id=user.id,

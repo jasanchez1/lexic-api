@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Union
 from uuid import UUID, uuid4
 
@@ -34,9 +34,9 @@ def create_access_token(
     Create a JWT access token
     """
     if expires_delta:
-        expire = datetime.now(tz=UTC) + expires_delta
+        expire = datetime.now(tz=timezone.utc) + expires_delta
     else:
-        expire = datetime.now(tz=UTC) + timedelta(
+        expire = datetime.now(tz=timezone.utc) + timedelta(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     
@@ -51,7 +51,7 @@ def create_refresh_token(subject: Union[str, UUID]) -> str:
     Create a JWT refresh token with a longer expiry time
     """
     # Typically refresh tokens last longer than access tokens
-    expire = datetime.now(tz=UTC) + timedelta(days=7)
+    expire = datetime.now(tz=timezone.utc) + timedelta(days=7)
     
     # Add a unique identifier for the refresh token (jti claim)
     jti = str(uuid4())
