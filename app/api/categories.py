@@ -53,7 +53,7 @@ async def get_areas_by_category_slug(slug: str, db: Session = Depends(get_db)):
         
     return areas_repository.get_areas(db, category_id=db_category.id, limit=1000)
 
-@router.post("/", response_model=PracticeAreaCategory, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PracticeAreaCategory, status_code=status.HTTP_201_CREATED)
 async def create_practice_area_category(
     category: PracticeAreaCategoryCreate, 
     db: Session = Depends(get_db)

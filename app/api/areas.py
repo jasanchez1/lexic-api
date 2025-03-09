@@ -11,7 +11,7 @@ from app.schemas.category import PracticeAreaCategoryWithAreas
 
 router = APIRouter()
 
-@router.get("/", response_model=List[PracticeArea])
+@router.get("", response_model=List[PracticeArea])
 async def get_practice_areas(
     db: Session = Depends(get_db),
     skip: int = 0,
@@ -74,7 +74,7 @@ async def get_practice_area_by_slug(slug: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Practice area not found")
     return db_area
 
-@router.post("/", response_model=PracticeArea, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PracticeArea, status_code=status.HTTP_201_CREATED)
 async def create_practice_area(
     area: PracticeAreaCreate, 
     db: Session = Depends(get_db)

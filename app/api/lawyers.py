@@ -14,7 +14,7 @@ from app.db.repositories.users import get_user_by_id
 
 router = APIRouter()
 
-@router.get("/", response_model=LawyerList)
+@router.get("", response_model=LawyerList)
 async def search_lawyers(
     db: Session = Depends(get_db),
     area: Optional[str] = None,
@@ -95,7 +95,7 @@ async def get_lawyer(
     return lawyer_dict
 
 
-@router.post("/", response_model=Lawyer, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Lawyer, status_code=status.HTTP_201_CREATED)
 async def create_lawyer(
     lawyer: LawyerCreate, 
     db: Session = Depends(get_db),
