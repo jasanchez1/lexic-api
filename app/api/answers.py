@@ -25,7 +25,6 @@ router = APIRouter()
 async def get_answers_for_question(
     question_id: UUID,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Lists all answers for a specific question
