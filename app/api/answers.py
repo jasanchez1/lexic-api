@@ -69,10 +69,6 @@ async def get_answers_for_question(
         # Get helpful count and status
         helpful_count = answers_repository.get_helpful_count(db, answer.id)
         is_helpful = False
-        if current_user:
-            is_helpful = answers_repository.is_helpful_for_user(
-                db, answer.id, current_user.id
-            )
 
         # Get reply count
         reply_count = len(answer.replies)
