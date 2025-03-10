@@ -13,10 +13,22 @@ PGPASSWORD=postgres psql -h localhost -U postgres -tc "SELECT 1 FROM pg_database
 echo "Running Alembic migrations..."
 alembic upgrade head
 
+echo "Seeding cities..."
+python scripts/seed_cities.py
+
+echo "Seeding legal topics..."
+python scripts/seed_topics.py
+
 echo "Seeding practice areas..."
 python scripts/seed_practice_areas.py
 
 echo "Seeding lawyers..."
 python scripts/seed_lawyers.py
+
+echo "Seeding questions..."
+python scripts/seed_questions.py
+
+echo "Seeding answers and replies..."
+python scripts/seed_answers.py
 
 echo "Seeding completed successfully!"
