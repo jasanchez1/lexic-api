@@ -12,6 +12,11 @@ from app.models.user import User
 from app.models.area import lawyer_area_association
 from app.db.repositories.users import get_user_by_id
 
+# Import routers for lawyer-related endpoints
+from app.api.reviews import router as reviews_router
+from app.api.experience import router as experience_router
+from app.api.messages import router as messages_router
+
 router = APIRouter()
 
 @router.get("", response_model=LawyerList)
@@ -249,3 +254,8 @@ async def delete_lawyer(
     
     lawyers_repository.delete_lawyer(db, lawyer_id)
     return None
+
+# Include subrouters for lawyer-related endpoints
+router.include_router(reviews_router, prefix="")
+router.include_router(experience_router, prefix="")
+router.include_router(messages_router, prefix="")

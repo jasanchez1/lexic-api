@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, health, areas, lawyers, categories, cities, topics, questions, answers
+from app.api import auth, health, areas, lawyers, categories, cities, topics, questions, answers, analytics
 from app.core.config import settings
 
 app = FastAPI(
@@ -29,3 +29,4 @@ app.include_router(cities.router, prefix="/cities", tags=["cities"])
 app.include_router(topics.router, prefix="/topics", tags=["topics"])
 app.include_router(questions.router, prefix="/questions", tags=["questions"])
 app.include_router(answers.router, tags=["answers"])
+app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])

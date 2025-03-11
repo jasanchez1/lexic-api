@@ -32,3 +32,6 @@ echo "Seeding answers and replies..."
 python scripts/seed_answers.py
 
 echo "Seeding completed successfully!"
+
+echo "Seeding lawyer reviews, experience, messages and calls..."
+python scripts/seed_lawyer_data.py

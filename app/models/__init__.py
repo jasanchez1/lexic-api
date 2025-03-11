@@ -7,3 +7,6 @@ from app.models.city import City
 from app.models.topic import Topic, QuestionTopic
 from app.models.question import Question, PlanToHire
 from app.models.answer import Answer, Reply, answer_helpful_votes
+from app.models.review import Review
+from app.models.experience import Education, WorkExperience, Achievement
+from app.models.message import Message, Call

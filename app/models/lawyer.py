@@ -37,3 +37,10 @@ class Lawyer(Base):
         secondary=lawyer_area_association,
         back_populates="lawyers"
     )
+    # Additional relationships
+    reviews = relationship("app.models.review.Review", back_populates="lawyer", cascade="all, delete-orphan")
+    education = relationship("app.models.experience.Education", back_populates="lawyer", cascade="all, delete-orphan") 
+    work_experience = relationship("app.models.experience.WorkExperience", back_populates="lawyer", cascade="all, delete-orphan")
+    achievements = relationship("app.models.experience.Achievement", back_populates="lawyer", cascade="all, delete-orphan")
+    messages = relationship("app.models.message.Message", back_populates="lawyer", cascade="all, delete-orphan")
+    calls = relationship("app.models.message.Call", back_populates="lawyer", cascade="all, delete-orphan")
