@@ -5,31 +5,44 @@ from sqlalchemy import func
 
 from app.models.area import PracticeArea as PracticeAreaModel
 from app.models.area import lawyer_area_association
-from app.schemas.area import PracticeAreaCreate, PracticeAreaUpdate
+from app.schemas.area import (
+    PracticeAreaCreate,
+    PracticeAreaUpdate,
+    PracticeAreaWithCount,
+)
 from app.models.category import PracticeAreaCategory
+
 
 def get_area_by_id(db: Session, area_id: UUID) -> Optional[PracticeAreaModel]:
     """
     Get a practice area by ID
     """
-    return db.query(PracticeAreaModel).options(
-        joinedload(PracticeAreaModel.category_rel)
-    ).filter(PracticeAreaModel.id == area_id).first()
+    return (
+        db.query(PracticeAreaModel)
+        .options(joinedload(PracticeAreaModel.category_rel))
+        .filter(PracticeAreaModel.id == area_id)
+        .first()
+    )
+
 
 def get_area_by_slug(db: Session, slug: str) -> Optional[PracticeAreaModel]:
     """
     Get a practice area by slug
     """
-    return db.query(PracticeAreaModel).options(
-        joinedload(PracticeAreaModel.category_rel)
-    ).filter(PracticeAreaModel.slug == slug).first()
+    return (
+        db.query(PracticeAreaModel)
+        .options(joinedload(PracticeAreaModel.category_rel))
+        .filter(PracticeAreaModel.slug == slug)
+        .first()
+    )
+
 
 def get_areas(
-    db: Session, 
-    skip: int = 0, 
-    limit: int = 100, 
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
     category_id: Optional[UUID] = None,
-    category_slug: Optional[str] = None
+    category_slug: Optional[str] = None,
 ) -> List[PracticeAreaModel]:
     """
     Get a list of practice areas with optional category filtering
@@ -37,55 +50,74 @@ def get_areas(
     query = db.query(PracticeAreaModel).options(
         joinedload(PracticeAreaModel.category_rel)
     )
-    
+
     if category_id:
         query = query.filter(PracticeAreaModel.category_id == category_id)
 
     if category_slug:
-        query = query.join(PracticeAreaCategory).filter(PracticeAreaCategory.slug == category_slug)
-        
+        query = query.join(PracticeAreaCategory).filter(
+            PracticeAreaCategory.slug == category_slug
+        )
+
     return query.offset(skip).limit(limit).all()
 
-def get_areas_with_counts(db: Session) -> List[dict]:
+
+def get_areas_with_counts(db: Session) -> List[PracticeAreaWithCount]:
     """
     Get all practice areas with lawyer counts
     """
-    results = db.query(
-        PracticeAreaModel,
-        func.count(lawyer_area_association.c.lawyer_id).label('lawyer_count')
-    ).options(
-        joinedload(PracticeAreaModel.category_rel)
-    ).outerjoin(
-        lawyer_area_association,
-        PracticeAreaModel.id == lawyer_area_association.c.area_id
-    ).group_by(
-        PracticeAreaModel.id
-    ).all()
-    
+    count_query = (
+        db.query(
+            PracticeAreaModel.id,
+            func.count(lawyer_area_association.c.lawyer_id).label("lawyer_count"),
+        )
+        .outerjoin(
+            lawyer_area_association,
+            PracticeAreaModel.id == lawyer_area_association.c.area_id,
+        )
+        .group_by(PracticeAreaModel.id)
+        .subquery()
+    )
+
+    results = (
+        db.query(PracticeAreaModel, count_query.c.lawyer_count)
+        .options(joinedload(PracticeAreaModel.category_rel))
+        .outerjoin(count_query, PracticeAreaModel.id == count_query.c.id)
+        .all()
+    )
+
     return [
-        {
-            "area": area,
-            "lawyer_count": count
-        }
+        PracticeAreaWithCount(
+            id=area.id,
+            name=area.name,
+            slug=area.slug,
+            category_id=area.category_id,
+            description=area.description,
+            lawyer_count=count,
+        )
         for area, count in results
     ]
+
 
 def get_areas_by_category(db: Session) -> Dict[str, List[PracticeAreaModel]]:
     """
     Get practice areas grouped by category
     """
-    areas = db.query(PracticeAreaModel).options(
-        joinedload(PracticeAreaModel.category_rel)
-    ).all()
+    areas = (
+        db.query(PracticeAreaModel)
+        .options(joinedload(PracticeAreaModel.category_rel))
+        .all()
+    )
     grouped = {}
-    
+
     for area in areas:
         category_id = str(area.category_id)
         if category_id not in grouped:
             grouped[category_id] = []
         grouped[category_id].append(area)
-        
+
     return grouped
+
 
 def create_area(db: Session, area_in: PracticeAreaCreate) -> PracticeAreaModel:
     """
@@ -102,19 +134,23 @@ def create_area(db: Session, area_in: PracticeAreaCreate) -> PracticeAreaModel:
     db.refresh(db_area)
     return db_area
 
-def update_area(db: Session, area: PracticeAreaModel, area_in: PracticeAreaUpdate) -> PracticeAreaModel:
+
+def update_area(
+    db: Session, area: PracticeAreaModel, area_in: PracticeAreaUpdate
+) -> PracticeAreaModel:
     """
     Update a practice area
     """
     update_data = area_in.dict(exclude_unset=True)
-    
+
     for key, value in update_data.items():
         setattr(area, key, value)
-        
+
     db.add(area)
     db.commit()
     db.refresh(area)
     return area
+
 
 def delete_area(db: Session, area_id: UUID) -> None:
     """

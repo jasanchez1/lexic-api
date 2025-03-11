@@ -6,7 +6,7 @@ from uuid import UUID
 from app.db.database import get_db
 from app.db.repositories import areas as areas_repository
 from app.db.repositories import categories as categories_repository
-from app.schemas.area import PracticeArea, PracticeAreaCreate, PracticeAreaUpdate
+from app.schemas.area import PracticeArea, PracticeAreaCreate, PracticeAreaUpdate, PracticeAreaWithCount
 from app.schemas.category import PracticeAreaCategoryWithAreas
 
 router = APIRouter()
@@ -23,6 +23,13 @@ async def get_practice_areas(
     Retrieve all practice areas with optional filtering by category
     """
     return areas_repository.get_areas(db, skip, limit, category_id, category_slug)
+
+@router.get("/with-counts", response_model=List[PracticeAreaWithCount])
+async def get_practice_areas_with_counts(db: Session = Depends(get_db)):
+    """
+    Retrieve all practice areas with lawyer counts
+    """
+    return areas_repository.get_areas_with_counts(db)
 
 @router.get("/by-category", response_model=List[PracticeAreaCategoryWithAreas])
 async def get_practice_areas_by_category(db: Session = Depends(get_db)):
