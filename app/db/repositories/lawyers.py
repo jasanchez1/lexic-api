@@ -218,3 +218,26 @@ def delete_lawyer(db: Session, lawyer_id: UUID) -> None:
         db.delete(lawyer)
         db.commit()
     return None
+
+def update_lawyer_review_score(db: Session, lawyer_id: UUID, rating: int) -> None:
+    """
+    Update a lawyer's review score and count
+    """
+    # Get the current review score and count
+    current_score, current_count = db.query(
+        LawyerModel.review_score, LawyerModel.review_count
+    ).filter(LawyerModel.id == lawyer_id).first()
+    
+    # Calculate new score and count
+    new_score = (current_score * current_count + rating) / (current_count + 1)
+    new_count = current_count + 1
+    
+    # Update the lawyer
+    db.execute(
+        LawyerModel.__table__.update().where(LawyerModel.id == lawyer_id).values(
+            review_score=new_score,
+            review_count=new_count
+        )
+    )
+    db.commit()
+    return None

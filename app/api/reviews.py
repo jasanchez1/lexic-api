@@ -72,6 +72,9 @@ async def create_lawyer_review(
     
     # Create review
     db_review = reviews_repository.create_review(db, review, lawyer_id)
+
+    # update lawyer review score
+    lawyers_repository.update_lawyer_review_score(db, lawyer_id, db_review.rating)
     
     return {
         "success": True,
