@@ -12,11 +12,13 @@ from app.models.user import User
 
 router = APIRouter()
 
+
 @router.post("/{lawyer_id}/messages", status_code=status.HTTP_201_CREATED)
 async def send_message_to_lawyer(
     lawyer_id: UUID,
     message: MessageCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Send a message to a lawyer
@@ -25,11 +27,8 @@ async def send_message_to_lawyer(
     lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
     if not lawyer:
         raise HTTPException(status_code=404, detail="Lawyer not found")
-    
+
     # Create message
     db_message = messages_repository.create_message(db, message, lawyer_id)
-    
-    return MessageCreateResponse(
-        success=True,
-        message_id=str(db_message.id)
-    )
+
+    return MessageCreateResponse(success=True, message_id=str(db_message.id))

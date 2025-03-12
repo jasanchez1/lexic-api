@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from uuid import UUID
 
+from app.api.dependencies import get_current_user
 from app.db.database import get_db
 from app.db.repositories import reviews as reviews_repository
 from app.db.repositories import lawyers as lawyers_repository
+from app.models.user import User
 from app.schemas.review import ReviewResponse, ReviewCreate, ReviewUpdate, ReviewsResponse, ReviewAuthor
 
 router = APIRouter()
@@ -60,7 +62,8 @@ async def get_lawyer_reviews(
 async def create_lawyer_review(
     lawyer_id: UUID,
     review: ReviewCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Create a new review for a lawyer
