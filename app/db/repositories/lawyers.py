@@ -137,8 +137,8 @@ def search_lawyers(
             "created_at": lawyer.created_at,
             "updated_at": lawyer.updated_at,
             "areas": processed_areas,
-            "review_score": 0.0,  # Default placeholder value
-            "review_count": 0     # Default placeholder value
+            "review_score": lawyer.review_score,
+            "review_count": lawyer.review_count
         }
         
         result_lawyers.append(lawyer_dict)
