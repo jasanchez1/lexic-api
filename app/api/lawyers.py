@@ -94,9 +94,7 @@ async def get_lawyer(
         })
     
     lawyer_dict["areas"] = processed_areas
-    lawyer_dict["review_score"] = 0.0  # Default value
-    lawyer_dict["review_count"] = 0    # Default value
-    
+
     return lawyer_dict
 
 

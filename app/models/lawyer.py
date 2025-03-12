@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, ARRAY
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Text, ARRAY, Integer, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -27,6 +27,8 @@ class Lawyer(Base):
     catchphrase = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    review_score = Column(Float, default=0.0)
+    review_count = Column(Integer, default=0)
     
     # Relationship with user - using string to avoid circular import
     user = relationship("app.models.user.User", backref="lawyer_profile")
