@@ -13,6 +13,10 @@ PGPASSWORD=postgres psql -h localhost -U postgres -tc "SELECT 1 FROM pg_database
 echo "Running Alembic migrations..."
 alembic upgrade head
 
+# Seed users FIRST - this is essential for user_id in messages and reviews
+echo "Seeding users..."
+python scripts/seed_users.py
+
 echo "Seeding cities..."
 python scripts/seed_cities.py
 
@@ -31,7 +35,8 @@ python scripts/seed_questions.py
 echo "Seeding answers and replies..."
 python scripts/seed_answers.py
 
-echo "Seeding completed successfully!"
-
 echo "Seeding lawyer reviews, experience, messages and calls..."
 python scripts/seed_lawyer_data.py
+
+echo "Seeding completed successfully!"
+echo "You now have a complete database with users, questions, lawyers, reviews, and messages."

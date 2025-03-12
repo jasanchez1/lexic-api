@@ -1,4 +1,3 @@
-# scripts/seed_lawyer_data.py
 import sys
 import os
 import random
@@ -17,10 +16,11 @@ if not os.environ.get("DATABASE_URL"):
 
 from app.db.database import SessionLocal
 from app.models.lawyer import Lawyer
+from app.models.user import User
 from app.models.review import Review
 from app.models.experience import Education, WorkExperience, Achievement
 from app.models.message import Message, Call
-from app.schemas.review import ReviewCreate
+from app.schemas.review import ReviewCreate, ReviewAuthor
 from app.schemas.experience import (
     EducationCreate,
     WorkExperienceCreate,
@@ -30,6 +30,7 @@ from app.schemas.message import MessageCreate, CallCreate
 from app.db.repositories import reviews as reviews_repository
 from app.db.repositories import experience as experience_repository
 from app.db.repositories import messages as messages_repository
+from app.db.repositories import lawyers as lawyers_repository
 
 # Sample data for lawyer reviews
 REVIEWS = [
@@ -230,6 +231,12 @@ def seed_lawyer_data():
             print("No lawyers found in database. Please seed lawyers first.")
             return
 
+        # Get all users
+        users = db.query(User).all()
+        if not users:
+            print("No users found in database. Please create some users first.")
+            return
+
         # Set a base date for created_at
         base_date = datetime.now(timezone.utc) - timedelta(days=180)
 
@@ -254,9 +261,21 @@ def seed_lawyer_data():
                     # Generate a random created_at date
                     days_ago = random.randint(1, 180)
                     created_at = base_date + timedelta(days=days_ago)
+                    
+                    # Select a random user as the author
+                    random_user = random.choice(users)
 
-                    # Create review
-                    review_create = ReviewCreate(**review_data)
+                    # Create review with user_id
+                    review_create = ReviewCreate(
+                        rating=review_data["rating"],
+                        title=review_data["title"],
+                        content=review_data["content"],
+                        author=ReviewAuthor(**review_data["author"]),
+                        is_hired=review_data["is_hired"],
+                        is_anonymous=review_data["is_anonymous"],
+                        user_id=random_user.id  # Added user_id
+                    )
+                    
                     db_review = reviews_repository.create_review(
                         db, review_create, lawyer.id
                     )
@@ -266,6 +285,10 @@ def seed_lawyer_data():
                     db_review.updated_at = created_at
                     db.add(db_review)
                     db.commit()
+                    
+                    # Update lawyer review score
+                    lawyers_repository.update_lawyer_review_score(db, lawyer.id, db_review.rating)
+                    
                     count += 1
 
             print(f"Successfully seeded {count} lawyer reviews")
@@ -372,9 +395,19 @@ def seed_lawyer_data():
                     # Generate a random created_at date
                     days_ago = random.randint(1, 90)
                     created_at = datetime.now(timezone.utc) - timedelta(days=days_ago)
+                    
+                    # Select a random user as the sender
+                    random_user = random.choice(users)
 
-                    # Create message
-                    message_create = MessageCreate(**message_data)
+                    # Create message with user_id
+                    message_create = MessageCreate(
+                        name=message_data["name"],
+                        email=message_data["email"],
+                        phone=message_data.get("phone"),
+                        message=message_data["message"],
+                        user_id=random_user.id  # Added user_id
+                    )
+                    
                     db_message = messages_repository.create_message(
                         db, message_create, lawyer.id
                     )

@@ -25,7 +25,7 @@ QUESTIONS = [
     {
         "title": "¿Puedo modificar el monto de pensión de alimentos?",
         "content": "Hace dos años se fijó una pensión de alimentos para mis hijos, pero ahora mis ingresos han disminuido considerablemente debido a un cambio de trabajo. ¿Es posible solicitar una reducción del monto? ¿Cuál es el procedimiento y qué factores considera el juez?",
-        "topic_slugs": ["pension-alimentos", "divorcios-pension-alimenticia"],
+        "topic_slugs": ["pension-alimentos", "divorcio"],
         "location": "Santiago, Chile",
         "plan_to_hire": "maybe"
     },
@@ -77,6 +77,20 @@ QUESTIONS = [
         "topic_slugs": ["constitucion-empresas", "derecho-comercial"],
         "location": "Viña del Mar, Chile",
         "plan_to_hire": "yes"
+    },
+    {
+        "title": "Demanda por ruidos molestos de departamento vecino",
+        "content": "Vivo en un edificio y desde hace tres meses mis vecinos hacen fiestas hasta altas horas de la noche cada fin de semana. He hablado con ellos, con la administración y hasta he llamado a Carabineros, pero el problema continúa. ¿Puedo presentar alguna demanda legal contra ellos? ¿Cuál sería el procedimiento?",
+        "topic_slugs": ["problemas-vecinos", "derecho-civil"],
+        "location": "Santiago, Chile",
+        "plan_to_hire": "maybe"
+    },
+    {
+        "title": "Consecuencias legales de no pagar cuotas de crédito hipotecario",
+        "content": "Debido a problemas económicos recientes, no he podido pagar las últimas tres cuotas de mi crédito hipotecario. ¿Qué consecuencias legales podría enfrentar? ¿Existe alguna manera de renegociar el crédito con el banco para evitar perder mi casa?",
+        "topic_slugs": ["deudas-embargos", "derecho-civil"],
+        "location": "Antofagasta, Chile",
+        "plan_to_hire": "yes"
     }
 ]
 
@@ -99,6 +113,10 @@ def seed_questions():
         
         # Get topic mapping (slug to ID)
         topics = db.query(Topic).all()
+        if not topics:
+            print("No topics found in database. Please run seed_topics.py first.")
+            return
+            
         topic_map = {topic.slug: topic.id for topic in topics}
         
         print("Seeding questions...")
@@ -111,14 +129,23 @@ def seed_questions():
             # Get topic IDs from slugs
             topic_ids = []
             for slug in question_data.pop("topic_slugs"):
-                if slug in topic_map:
-                    topic_ids.append(topic_map[slug])
-                else:
-                    print(f"Warning: Topic with slug '{slug}' not found, skipping.")
+                # Try to find closest matching topic in case exact slug doesn't exist
+                matching_topic = None
+                for topic_slug in topic_map:
+                    if slug in topic_slug or topic_slug in slug:
+                        matching_topic = topic_map[topic_slug]
+                        break
+                
+                if not matching_topic and topic_map:
+                    # If no match found, just use a random topic
+                    matching_topic = random.choice(list(topic_map.values()))
+                    
+                if matching_topic:
+                    topic_ids.append(matching_topic)
             
-            if not topic_ids:
-                print(f"No valid topics found for question '{question_data['title']}', skipping.")
-                continue
+            if not topic_ids and topic_map:
+                # If no valid topics found at all, add a random one
+                topic_ids.append(random.choice(list(topic_map.values())))
             
             # Select a random user as the author
             user = random.choice(users)
@@ -162,6 +189,8 @@ def seed_questions():
         
     except Exception as e:
         print(f"Error seeding questions: {e}")
+        import traceback
+        traceback.print_exc()
         
     finally:
         db.close()

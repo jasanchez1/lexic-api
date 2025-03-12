@@ -28,7 +28,15 @@ async def send_message_to_lawyer(
     if not lawyer:
         raise HTTPException(status_code=404, detail="Lawyer not found")
 
+    # Ensure the user_id in the message matches the current user
+    if message.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="User ID in message must match the authenticated user")
+
     # Create message
     db_message = messages_repository.create_message(db, message, lawyer_id)
 
-    return MessageCreateResponse(success=True, message_id=str(db_message.id))
+    return MessageCreateResponse(
+        success=True, 
+        message_id=str(db_message.id), 
+        user_id=db_message.user_id
+    )
