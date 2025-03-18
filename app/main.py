@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 
-from app.api import auth, health, areas, lawyers, categories, cities, topics, questions, answers, analytics
+from app.api import auth, health, areas, lawyers, categories, cities, topics, questions, answers, analytics, guides
 from app.core.config import settings
 
 app = FastAPI(
@@ -19,6 +21,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create uploads directory if it doesn't exist
+os.makedirs("uploads/guide_images", exist_ok=True)
+
+# Mount static files directory for uploaded images
+app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -30,3 +38,4 @@ app.include_router(topics.router, prefix="/topics", tags=["topics"])
 app.include_router(questions.router, prefix="/questions", tags=["questions"])
 app.include_router(answers.router, tags=["answers"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+app.include_router(guides.router, prefix="/guides", tags=["guides"])

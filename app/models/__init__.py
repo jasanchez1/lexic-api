@@ -10,3 +10,13 @@ from app.models.answer import Answer, Reply, answer_helpful_votes
 from app.models.review import Review
 from app.models.experience import Education, WorkExperience, Achievement
 from app.models.message import Message, Call
+from app.models.guide import Guide, GuideSection, guide_related_guides
+from app.models.analytics import (
+    ProfileView, ProfileViewCount,
+    MessageEvent, MessageEventCount,
+    CallEvent, CallEventCount,
+    ProfileImpression, ProfileImpressionCount,
+    ListingClick, ListingClickCount,
+    GuideView, GuideViewCount,
+    QuestionView, QuestionViewCount
+)
