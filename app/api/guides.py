@@ -95,7 +95,6 @@ async def check_slug_availability(
 async def create_guide(
     guide: GuideCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_verified_user)
 ):
     """
     Create a new guide
@@ -119,7 +118,6 @@ async def update_guide(
     guide_id: UUID,
     guide: GuideUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_verified_user)
 ):
     """
     Update an existing guide
@@ -147,7 +145,6 @@ async def update_guide(
 async def delete_guide(
     guide_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_verified_user)
 ):
     """
     Delete a guide
@@ -168,7 +165,6 @@ async def update_section(
     section_id: UUID,
     section: GuideSectionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_verified_user)
 ):
     """
     Update a specific section of a guide

@@ -145,7 +145,7 @@ class GuideView(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    guide = relationship("app.models.guide.Guide", backref="guide_views")
+    guide = relationship("app.models.guide.Guide", backref="analytics_guide_views")
     user = relationship("app.models.user.User", backref="guide_views")
 
 class GuideViewCount(Base):
@@ -153,10 +153,10 @@ class GuideViewCount(Base):
 
     guide_id = Column(UUID(as_uuid=True), ForeignKey("guides.id", ondelete="CASCADE"), primary_key=True)
     count = Column(Integer, default=0)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Relationships
-    guide = relationship("app.models.guide.Guide", backref="view_count")
+    guide = relationship("Guide", foreign_keys=[guide_id], passive_deletes=True)
+
 
 class QuestionView(Base):
     __tablename__ = "question_views"
@@ -179,4 +179,4 @@ class QuestionViewCount(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    question = relationship("app.models.question.Question", backref="analytics_view_count")  # Changed from "view_count" to "analytics_view_count"
+    question = relationship("app.models.question.Question", backref="analytics_view_count")
