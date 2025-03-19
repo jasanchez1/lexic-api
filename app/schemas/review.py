@@ -19,7 +19,7 @@ class ReviewAuthor(BaseModel):
 
 class ReviewCreate(ReviewBase):
     author: ReviewAuthor
-    user_id: UUID
+    user_id: Optional[UUID] = None
 
 
 class ReviewUpdate(BaseModel):
@@ -34,8 +34,8 @@ class ReviewInDB(ReviewBase):
     id: UUID
     author_name: str
     lawyer_id: UUID
-    user_id: UUID
     created_at: datetime
+    user_id: Optional[UUID]
 
     class Config:
         from_attributes = True
@@ -47,9 +47,9 @@ class ReviewResponse(ReviewBase):
     id: UUID
     author: ReviewAuthor
     lawyer_id: UUID
-    user_id: UUID
     created_at: datetime
     date: datetime
+    user_id: Optional[UUID]
 
 
 class ReviewStats(BaseModel):
@@ -66,4 +66,4 @@ class ReviewsResponse(BaseModel):
 class ReviewCreateResponse(BaseModel):
     success: bool
     review_id: str
-    user_id: UUID
+    user_id: Optional[UUID]

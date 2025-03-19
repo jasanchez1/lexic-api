@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_optional_current_user
 from app.db.database import get_db
 from app.db.repositories import reviews as reviews_repository
 from app.db.repositories import lawyers as lawyers_repository
@@ -50,7 +50,7 @@ async def get_lawyer_reviews(lawyer_id: UUID, db: Session = Depends(get_db)):
                     email=review.author_email,
                 ),
                 lawyer_id=review.lawyer_id,
-                user_id=review.user_id,  # Added user_id
+                user_id=review.user_id,
                 is_hired=review.is_hired,
                 is_anonymous=review.is_anonymous,
                 created_at=review.created_at,
@@ -66,7 +66,7 @@ async def create_lawyer_review(
     lawyer_id: UUID,
     review: ReviewCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_optional_current_user),
 ):
     """
     Create a new review for a lawyer
@@ -77,7 +77,7 @@ async def create_lawyer_review(
         raise HTTPException(status_code=404, detail="Lawyer not found")
 
     # Ensure the user_id in the review matches the current user
-    if review.user_id != current_user.id:
+    if current_user and review.user_id != current_user.id:
         raise HTTPException(
             status_code=403,
             detail="User ID in review must match the authenticated user",
@@ -92,7 +92,7 @@ async def create_lawyer_review(
     return {
         "success": True,
         "review_id": str(db_review.id),
-        "user_id": db_review.user_id,  # Added user_id in response
+        "user_id": db_review.user_id,
     }
 
 
