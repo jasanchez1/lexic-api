@@ -172,7 +172,8 @@ def create_profile_impression(db: Session, impression: ProfileImpressionCreate) 
         search_query=impression.search_query,
         area_slug=impression.area_slug,
         city_slug=impression.city_slug,
-        timestamp=impression.timestamp
+        timestamp=impression.timestamp,
+        position=impression.position
     )
     db.add(db_impression)
     
