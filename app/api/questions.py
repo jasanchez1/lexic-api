@@ -163,7 +163,7 @@ async def get_question(
 async def create_question(
     question: QuestionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Create a new legal question
@@ -176,8 +176,12 @@ async def create_question(
                 status_code=404, detail=f"Topic with ID {topic_id} not found"
             )
 
+    current_user_id = None
+    if current_user:
+        current_user_id = current_user.id
+
     # Create the question
-    db_question = questions_repository.create_question(db, question, current_user.id)
+    db_question = questions_repository.create_question(db, question, current_user_id)
 
     # Format the response
     author = {

@@ -34,7 +34,7 @@ class QuestionUpdate(BaseModel):
 
 class QuestionInDB(QuestionBase):
     id: UUID
-    user_id: UUID
+    user_id: Optional[UUID] = None
     view_count: int = 0
     created_at: datetime
     updated_at: datetime
