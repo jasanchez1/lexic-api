@@ -129,10 +129,12 @@ async def get_question(
     )
 
     # Format author info
-    author = {
-        "name": f"{question.user.first_name or ''} {question.user.last_name or ''}".strip(),
-        "location": question.location or "Unknown",
-    }
+    author = None
+    if question.user:
+        author = {
+            "name": f"{question.user.first_name or ''} {question.user.last_name or ''}".strip(),
+            "location": question.location or "Unknown",
+        }
 
     # Get topic IDs
     topic_ids = [topic.id for topic in question.topics]
@@ -177,17 +179,17 @@ async def create_question(
             )
 
     current_user_id = None
+    author = None
     if current_user:
         current_user_id = current_user.id
+        author = {
+            "name": f"{current_user.first_name or ''} {current_user.last_name or ''}".strip(),
+            "location": question.location or "Unknown",
+        }
 
     # Create the question
     db_question = questions_repository.create_question(db, question, current_user_id)
 
-    # Format the response
-    author = {
-        "name": f"{current_user.first_name or ''} {current_user.last_name or ''}".strip(),
-        "location": question.location or "Unknown",
-    }
 
     return QuestionResponse(
         **{

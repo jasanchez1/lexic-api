@@ -44,10 +44,10 @@ class QuestionInDB(QuestionBase):
 
 class QuestionResponse(QuestionInDB):
     """Question schema for API responses"""
-    author: QuestionAuthor
     date: datetime
     topic_ids: List[UUID] = []
     answer_count: int = 0
+    author: Optional[QuestionAuthor] = None
 
 class QuestionsList(BaseModel):
     """List of questions with pagination"""
