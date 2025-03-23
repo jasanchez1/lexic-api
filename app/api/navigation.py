@@ -82,15 +82,14 @@ async def get_navigation_menu(db: Session = Depends(get_db)):
     guides_result = []
     
     for featured_category in featured_guide_categories:
-        # The item_id for guide_category is the category slug
-        category_slug = featured_category.item_id
-        category_info = guides_repository.get_guide_category_info(db, category_slug)
+        # Get the guide category directly from the database
+        category = guides_repository.get_category_by_id(db, featured_category.item_id)
         
-        if not category_info:
+        if not category:
             continue
             
         # Get featured guides for this category
-        featured_guides = featured_repository.get_featured_items_by_type(db, "guide", category_slug)
+        featured_guides = featured_repository.get_featured_items_by_type(db, "guide", category.id)
         guides_data = []
         
         for featured_guide in featured_guides:
@@ -106,9 +105,9 @@ async def get_navigation_menu(db: Session = Depends(get_db)):
             })
             
         guides_result.append({
-            "id": category_info["id"],
-            "name": category_info["name"],
-            "slug": category_info["slug"],
+            "id": str(category.id),
+            "name": category.name,
+            "slug": category.slug,
             "featured_guides": guides_data
         })
     

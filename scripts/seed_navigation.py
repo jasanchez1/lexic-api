@@ -12,6 +12,7 @@ from typing import List, Dict
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models.featured_item import FeaturedItem
+from app.models.guide import GuideCategory
 from app.db.database import Base
 
 # Configure logging
@@ -135,68 +136,44 @@ def get_topic_ids(session) -> Dict[str, uuid.UUID]:
     topics = session.query(Topic.id, Topic.slug).all()
     return {topic.slug: topic.id for topic in topics}
 
-def seed_featured_guide_categories(session):
-    """Seed featured guide categories with correct types"""
-    # First, check the column types in the database
-    from sqlalchemy import inspect
-    inspector = inspect(session.bind)
-    columns = {col['name']: col['type'].python_type for col in inspector.get_columns('featured_items')}
+def get_guide_category_ids(session) -> Dict[str, uuid.UUID]:
+    """Get IDs of the existing guide categories by slug"""
     
-    logger.info(f"Featured items table columns: {columns}")
+    categories = session.query(GuideCategory.id, GuideCategory.slug).all()
+    return {category.slug: category.id for category in categories}
+
+def ensure_guide_categories_exist(session):
+    """
+    Ensure guide categories exist in the database, creating them if needed
+    """
+    # Get existing categories
+    existing_categories = get_guide_category_ids(session)
     
-    # Check if we need special handling for guide categories based on the schema
-    item_id_type = str  # Default assumption that item_id is a string type
+    # Collect unique category slugs from guide mappings
+    needed_categories = set(GUIDE_CATEGORIES.values())
     
-    # Check if FeaturedItem.item_id is typed as UUID in code but string in DB
-    featured_item = FeaturedItem()
-    if hasattr(featured_item, 'item_id'):
-        logger.info(f"FeaturedItem.item_id python type: {type(featured_item.item_id)}")
-    
-    # List of guide categories
-    guide_category_slugs = sorted(set(GUIDE_CATEGORIES.values()))
-    
-    for i, category_slug in enumerate(guide_category_slugs):
-        try:
-            # Try with string value first
-            item = FeaturedItem(
+    # Create categories if they don't exist
+    for slug in needed_categories:
+        if slug not in existing_categories:
+            # Create descriptive name from slug
+            name = slug.replace("-", " ").title()
+            
+            # Create new category
+            category = GuideCategory(
                 id=uuid.uuid4(),
-                item_id=category_slug,  # String value
-                item_type="guide_category",
-                display_order=i,
+                name=name,
+                slug=slug,
                 created_at=datetime.now(),
                 updated_at=datetime.now()
             )
-            session.add(item)
-            session.flush()  # Test if this works without committing
-            logger.info(f"Added featured guide category as string: {category_slug}")
-        except Exception as e:
-            session.rollback()
-            logger.warning(f"Failed to add guide category as string. Error: {e}")
-            
-            # Try again with a UUID value - create a deterministic UUID from the string
-            try:
-                # Create a namespace UUID (using DNS namespace)
-                namespace = uuid.uuid5(uuid.NAMESPACE_DNS, 'lexic.cl')
-                # Create a UUID for the category
-                category_uuid = uuid.uuid5(namespace, category_slug)
-                
-                item = FeaturedItem(
-                    id=uuid.uuid4(),
-                    item_id=category_uuid,  # UUID value
-                    item_type="guide_category",
-                    display_order=i,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                session.add(item)
-                session.flush()
-                logger.info(f"Added featured guide category as UUID: {category_slug} -> {category_uuid}")
-            except Exception as e2:
-                session.rollback()
-                logger.error(f"Failed to add guide category as UUID. Error: {e2}")
-                raise
+            session.add(category)
+            logger.info(f"Created guide category: {name} ({slug})")
     
+    # Commit changes
     session.commit()
+    
+    # Return updated category mapping
+    return get_guide_category_ids(session)
 
 def seed_featured_items(session):
     """Seed the featured items table"""
@@ -207,27 +184,48 @@ def seed_featured_items(session):
     area_ids = get_area_ids(session)
     topic_ids = get_topic_ids(session)
     
-    logger.info(f"Found {len(guide_ids)} guides, {len(category_ids)} categories, {len(area_ids)} areas, {len(topic_ids)} topics")
+    # Ensure guide categories exist
+    guide_category_ids = ensure_guide_categories_exist(session)
+    
+    logger.info(f"Found {len(guide_ids)} guides, {len(category_ids)} categories, {len(area_ids)} areas, "
+                f"{len(topic_ids)} topics, {len(guide_category_ids)} guide categories")
     
     # Clear existing featured items (optional - remove this if you want to keep existing items)
     session.query(FeaturedItem).delete()
     logger.info("Cleared existing featured items")
     
-    # First seed guide categories specially to handle the string/UUID issue
-    seed_featured_guide_categories(session)
-    
     featured_items = []
     
+    # Featured Guide Categories
+    for i, category_slug in enumerate(sorted(set(GUIDE_CATEGORIES.values()))):
+        if category_slug not in guide_category_ids:
+            logger.warning(f"Guide category not found: {category_slug}")
+            continue
+            
+        category_id = guide_category_ids[category_slug]
+        featured_items.append(
+            FeaturedItem(
+                id=uuid.uuid4(),
+                item_id=category_id,
+                item_type="guide_category",
+                display_order=i,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+        )
+        logger.info(f"Added featured guide category: {category_slug}")
+    
     # Featured Guides within Categories
-    # We need to handle parent_id special for guide categories
     for guide_slug, category_slug in GUIDE_CATEGORIES.items():
         if guide_slug not in guide_ids:
             logger.warning(f"Guide not found: {guide_slug}")
             continue
-        
-        # Create a UUID for the category from its name
-        namespace = uuid.uuid5(uuid.NAMESPACE_DNS, 'lexic.cl')
-        category_uuid = uuid.uuid5(namespace, category_slug)
+            
+        if category_slug not in guide_category_ids:
+            logger.warning(f"Guide category not found: {category_slug}")
+            continue
+            
+        category_id = guide_category_ids[category_slug]
         
         # Find position within category
         position = 0
@@ -237,13 +235,12 @@ def seed_featured_items(session):
                     break
                 position += 1
         
-        # Add guide with parent ID being the deterministic UUID created from category slug
         featured_items.append(
             FeaturedItem(
                 id=uuid.uuid4(),
                 item_id=guide_ids[guide_slug],
                 item_type="guide",
-                parent_id=category_uuid,
+                parent_id=category_id,
                 display_order=position,
                 created_at=datetime.now(),
                 updated_at=datetime.now()

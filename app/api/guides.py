@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, BackgroundTasks
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from uuid import UUID
 import os
@@ -9,7 +10,7 @@ from datetime import datetime
 from app.db.database import get_db
 from app.db.repositories import guides as guides_repository
 from app.schemas.guide import (
-    GuideCreate, GuideUpdate, GuidesList, GuideDetail, 
+    GuideCategory, GuideCategoryCreate, GuideCategoryList, GuideCategoryUpdate, GuideCategoryWithGuides, GuideCreate, GuideUpdate, GuidesList, GuideDetail, 
     GuideSectionUpdate, SectionsReorder, SlugCheckResponse,
     ImageUploadResponse, SuccessResponse, ErrorResponse
 )
@@ -25,7 +26,7 @@ async def get_guides(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     published_only: bool = True,
-    category_slug: Optional[str] = None  # Add this parameter
+    category_slug: Optional[str] = None
 ):
     """
     List all guides with basic information and pagination
@@ -250,9 +251,181 @@ async def upload_image(
     }
 
 
-@router.get("/categories", response_model=List[dict])
-async def get_guide_categories(db: Session = Depends(get_db)):
+
+@router.get("/categories", response_model=GuideCategoryList)
+async def get_guide_categories(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
     """
-    Get all unique guide categories with counts
+    List all guide categories with pagination
     """
-    return guides_repository.get_guide_categories(db)
+    skip = (page - 1) * limit
+    
+    # Get categories with guide counts
+    categories, total = guides_repository.get_categories(
+        db, 
+        skip=skip, 
+        limit=limit, 
+        with_counts=True
+    )
+    
+    # Calculate total pages
+    pages = (total + limit - 1) // limit
+    
+    return {
+        "categories": categories,
+        "total": total,
+        "page": page,
+        "pages": pages
+    }
+
+
+@router.get("/categories/{category_id}", response_model=GuideCategoryWithGuides)
+async def get_guide_category(
+    category_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific guide category by ID
+    """
+    category = guides_repository.get_category_by_id(db, category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Guide category not found")
+    
+    # Count guides in this category
+    guide_count = db.query(func.count("*")).filter_by(category_id=category_id).scalar() or 0
+    
+    return {
+        "id": category.id,
+        "name": category.name,
+        "slug": category.slug,
+        "description": category.description,
+        "created_at": category.created_at,
+        "updated_at": category.updated_at,
+        "guide_count": guide_count
+    }
+
+
+@router.get("/categories/slug/{slug}", response_model=GuideCategoryWithGuides)
+async def get_guide_category_by_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Get a specific guide category by slug
+    """
+    category = guides_repository.get_category_by_slug(db, slug)
+    if not category:
+        raise HTTPException(status_code=404, detail="Guide category not found")
+    
+    # Count guides in this category
+    guide_count = db.query(func.count("*")).filter_by(category_id=category.id).scalar() or 0
+    
+    return {
+        "id": category.id,
+        "name": category.name,
+        "slug": category.slug,
+        "description": category.description,
+        "created_at": category.created_at,
+        "updated_at": category.updated_at,
+        "guide_count": guide_count
+    }
+
+
+@router.get("/categories/slug-check/{slug}", response_model=SlugCheckResponse)
+async def check_category_slug_availability(
+    slug: str,
+    db: Session = Depends(get_db),
+    exclude_id: Optional[UUID] = None
+):
+    """
+    Check if a category slug is available for use
+    """
+    is_available = guides_repository.check_slug_availability(db, slug, exclude_id)
+    
+    if is_available:
+        return {"available": True}
+    else:
+        # Generate a suggestion
+        suggestion = guides_repository.get_slug_suggestion(db, slug)
+        return {"available": False, "suggestion": suggestion}
+
+
+@router.post("/categories", response_model=GuideCategory, status_code=status.HTTP_201_CREATED)
+async def create_guide_category(
+    category: GuideCategoryCreate,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new guide category
+    """
+    # Check if slug is available
+    if not guides_repository.check_slug_availability(db, category.slug):
+        raise HTTPException(
+            status_code=400,
+            detail="Slug is already in use. Please use a different slug."
+        )
+    
+    # Create the category
+    db_category = guides_repository.create_category(db, category)
+    
+    return db_category
+
+
+@router.patch("/categories/{category_id}", response_model=GuideCategory)
+async def update_guide_category(
+    category_id: UUID,
+    category: GuideCategoryUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    Update an existing guide category
+    """
+    # Check if category exists
+    db_category = guides_repository.get_category_by_id(db, category_id)
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Guide category not found")
+    
+    # Check if slug is being updated and if it's available
+    if category.slug is not None and category.slug != db_category.slug:
+        is_available = guides_repository.check_slug_availability(db, category.slug, exclude_id=category_id)
+        if not is_available:
+            raise HTTPException(
+                status_code=400,
+                detail="Slug is already in use. Please use a different slug."
+            )
+    
+    # Update the category
+    updated_category = guides_repository.update_category(db, db_category, category)
+    
+    return updated_category
+
+
+@router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_guide_category(
+    category_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a guide category
+    """
+    # Check if category exists
+    db_category = guides_repository.get_category_by_id(db, category_id)
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Guide category not found")
+    
+    # Check if any guides are using this category
+    from app.models.guide import Guide
+    guide_count = db.query(func.count(Guide.id)).filter(Guide.category_id == category_id).scalar()
+    if guide_count > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete this category as it is being used by {guide_count} guides. Update or delete those guides first."
+        )
+    
+    # Delete the category
+    guides_repository.delete_category(db, category_id)
+    
+    return None

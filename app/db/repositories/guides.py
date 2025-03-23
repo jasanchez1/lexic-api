@@ -1,11 +1,13 @@
 from typing import List, Optional, Tuple, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc
+from sqlalchemy import desc, func
 
 from app.models.analytics import GuideView, GuideViewCount
-from app.models.guide import Guide, GuideSection, guide_related_guides
+from app.models.guide import Guide, GuideCategory, GuideSection, guide_related_guides
 from app.schemas.guide import (
+    GuideCategoryCreate,
+    GuideCategoryUpdate,
     GuideCreate,
     GuideUpdate,
     GuideSectionUpdate,
@@ -19,7 +21,11 @@ def get_guide_by_id(db: Session, guide_id: UUID) -> Optional[Guide]:
     """
     return (
         db.query(Guide)
-        .options(joinedload(Guide.sections), joinedload(Guide.related_guides))
+        .options(
+            joinedload(Guide.sections),
+            joinedload(Guide.related_guides),
+            joinedload(Guide.category),
+        )
         .filter(Guide.id == guide_id)
         .first()
     )
@@ -31,31 +37,40 @@ def get_guide_by_slug(db: Session, slug: str) -> Optional[Guide]:
     """
     return (
         db.query(Guide)
-        .options(joinedload(Guide.sections), joinedload(Guide.related_guides))
+        .options(
+            joinedload(Guide.sections),
+            joinedload(Guide.related_guides),
+            joinedload(Guide.category),
+        )
         .filter(Guide.slug == slug)
         .first()
     )
 
 
 def get_guides(
-    db: Session, 
-    skip: int = 0, 
-    limit: int = 20, 
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
     published_only: bool = False,
-    category_slug: Optional[str] = None
+    category_slug: Optional[str] = None,
+    category_id: Optional[UUID] = None,
 ) -> Tuple[List[Guide], int]:
     """
     Get a list of guides with pagination and optional filtering
     Returns guides and total count
     """
-    query = db.query(Guide)
+    query = db.query(Guide).options(joinedload(Guide.category))
 
     if published_only:
         query = query.filter(Guide.published == True)
-        
+
     # Filter by category_slug if provided
     if category_slug:
         query = query.filter(Guide.category_slug == category_slug)
+
+    # Filter by category_id if provided
+    if category_id:
+        query = query.filter(Guide.category_id == category_id)
 
     # Get total count before pagination
     total = query.count()
@@ -78,6 +93,28 @@ def create_guide(db: Session, guide_in: GuideCreate) -> Guide:
         from slugify import slugify
 
         guide_data["slug"] = slugify(guide_data["title"])
+
+    # Handle category_id and legacy fields
+    if guide_data.get("category_id"):
+        # If category_id is provided, get category details for legacy fields
+        category = (
+            db.query(GuideCategory)
+            .filter(GuideCategory.id == guide_data["category_id"])
+            .first()
+        )
+        if category:
+            guide_data["category_name"] = category.name
+            guide_data["category_slug"] = category.slug
+    elif guide_data.get("category_slug"):
+        # If only category_slug is provided, look up the category_id
+        category = (
+            db.query(GuideCategory)
+            .filter(GuideCategory.slug == guide_data["category_slug"])
+            .first()
+        )
+        if category:
+            guide_data["category_id"] = category.id
+            guide_data["category_name"] = category.name
 
     db_guide = Guide(**guide_data)
     db.add(db_guide)
@@ -115,6 +152,28 @@ def update_guide(db: Session, guide: Guide, guide_in: GuideUpdate) -> Guide:
     update_data = guide_in.dict(
         exclude={"sections", "related_guide_ids"}, exclude_unset=True
     )
+
+    # Handle category update logic
+    if "category_id" in update_data and update_data["category_id"] is not None:
+        # If category_id is updated, update legacy fields too
+        category = (
+            db.query(GuideCategory)
+            .filter(GuideCategory.id == update_data["category_id"])
+            .first()
+        )
+        if category:
+            update_data["category_name"] = category.name
+            update_data["category_slug"] = category.slug
+    elif "category_slug" in update_data and update_data["category_slug"] is not None:
+        # If only category_slug is updated, look up the category_id
+        category = (
+            db.query(GuideCategory)
+            .filter(GuideCategory.slug == update_data["category_slug"])
+            .first()
+        )
+        if category:
+            update_data["category_id"] = category.id
+            update_data["category_name"] = category.name
 
     for key, value in update_data.items():
         setattr(guide, key, value)
@@ -286,44 +345,176 @@ def get_guide_categories(db: Session) -> List[dict]:
     """
     Get all unique guide categories with counts
     """
-    from sqlalchemy import func
-
-    # Query for unique categories with counts
-    categories = (
+    # Query for categories with counts using the new guide_categories table
+    results = (
         db.query(
-            Guide.category_slug,
-            Guide.category_name,
+            GuideCategory.id,
+            GuideCategory.name,
+            GuideCategory.slug,
             func.count(Guide.id).label("guide_count"),
         )
-        .filter(Guide.published == True, Guide.category_slug != None)
-        .group_by(Guide.category_slug, Guide.category_name)
-        .order_by(Guide.category_name)
+        .outerjoin(Guide, GuideCategory.id == Guide.category_id)
+        .filter(Guide.published == True)
+        .group_by(GuideCategory.id, GuideCategory.name, GuideCategory.slug)
+        .order_by(GuideCategory.name)
         .all()
     )
 
-    result = []
-    for slug, name, count in categories:
-        if slug and name:  # Ensure we have valid data
-            result.append({"slug": slug, "name": name, "guide_count": count})
-
-    return result
+    return [
+        {"id": str(id), "name": name, "slug": slug, "guide_count": guide_count}
+        for id, name, slug, guide_count in results
+    ]
 
 
 def get_guide_category_info(db: Session, category_slug: str) -> Optional[Dict]:
     """
-    Get guide category info from a sample guide
+    Get guide category info directly from the guide_categories table
     """
-    guide = (
-        db.query(Guide)
-        .filter(Guide.published == True, Guide.category_slug == category_slug)
-        .first()
+    category = (
+        db.query(GuideCategory).filter(GuideCategory.slug == category_slug).first()
     )
 
-    if not guide:
+    if not category:
         return None
 
     return {
-        "id": category_slug,  # Using slug as ID
-        "name": guide.category_name,
-        "slug": guide.category_slug,
+        "id": str(category.id),
+        "name": category.name,
+        "slug": category.slug,
     }
+
+
+def get_category_by_id(db: Session, category_id: UUID) -> Optional[GuideCategory]:
+    """
+    Get a guide category by ID
+    """
+    return db.query(GuideCategory).filter(GuideCategory.id == category_id).first()
+
+
+def get_category_by_slug(db: Session, slug: str) -> Optional[GuideCategory]:
+    """
+    Get a guide category by slug
+    """
+    return db.query(GuideCategory).filter(GuideCategory.slug == slug).first()
+
+
+def get_categories(
+    db: Session, skip: int = 0, limit: int = 20, with_counts: bool = False
+) -> Tuple[List[GuideCategory], int]:
+    """
+    Get a list of guide categories with pagination
+    Returns categories and total count
+    """
+    query = db.query(GuideCategory)
+
+    # Get total count before pagination
+    total = query.count()
+
+    # Apply pagination
+    categories = query.order_by(GuideCategory.name).offset(skip).limit(limit).all()
+
+    # Add guide counts if requested
+    if with_counts:
+        result = []
+        for category in categories:
+            # Count guides in this category
+            guide_count = (
+                db.query(func.count(Guide.id))
+                .filter(Guide.category_id == category.id)
+                .scalar()
+                or 0
+            )
+
+            # Create a dict with category attributes and guide count
+            category_dict = {
+                "id": category.id,
+                "name": category.name,
+                "slug": category.slug,
+                "description": category.description,
+                "created_at": category.created_at,
+                "updated_at": category.updated_at,
+                "guide_count": guide_count,
+            }
+            result.append(category_dict)
+        return result, total
+
+    return categories, total
+
+
+def create_category(db: Session, category: GuideCategoryCreate) -> GuideCategory:
+    """
+    Create a new guide category
+    """
+    db_category = GuideCategory(
+        name=category.name, slug=category.slug, description=category.description
+    )
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+
+def update_category(
+    db: Session, db_category: GuideCategory, category: GuideCategoryUpdate
+) -> GuideCategory:
+    """
+    Update a guide category
+    """
+    update_data = category.dict(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(db_category, key, value)
+
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category
+
+
+def delete_category(db: Session, category_id: UUID) -> None:
+    """
+    Delete a guide category
+    """
+    db_category = (
+        db.query(GuideCategory).filter(GuideCategory.id == category_id).first()
+    )
+    if db_category:
+        db.delete(db_category)
+        db.commit()
+    return None
+
+
+def check_slug_availability(
+    db: Session, slug: str, exclude_id: Optional[UUID] = None
+) -> bool:
+    """
+    Check if a category slug is available for use
+    """
+    query = db.query(GuideCategory).filter(GuideCategory.slug == slug)
+
+    if exclude_id:
+        query = query.filter(GuideCategory.id != exclude_id)
+
+    return query.first() is None
+
+
+def get_slug_suggestion(db: Session, base_slug: str) -> str:
+    """
+    Generate a unique slug suggestion based on a base slug
+    """
+    from slugify import slugify
+
+    # Make sure base_slug is slugified
+    slug = slugify(base_slug)
+
+    # Check if the base slug is available
+    if check_slug_availability(db, slug):
+        return slug
+
+    # If not, try appending numbers
+    counter = 1
+    while True:
+        new_slug = f"{slug}-{counter}"
+        if check_slug_availability(db, new_slug):
+            return new_slug
+        counter += 1
