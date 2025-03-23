@@ -50,10 +50,6 @@ class Guide(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     
-    # Legacy fields (to be removed after transition)
-    category_name = Column(String, nullable=True)
-    category_slug = Column(String, nullable=True, index=True)
-    
     # New category relationship
     category_id = Column(UUID(as_uuid=True), ForeignKey("guide_categories.id", ondelete="SET NULL"), nullable=True)
     category = relationship("GuideCategory", back_populates="guides")

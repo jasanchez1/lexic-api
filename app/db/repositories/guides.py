@@ -64,13 +64,16 @@ def get_guides(
     if published_only:
         query = query.filter(Guide.published == True)
 
-    # Filter by category_slug if provided
-    if category_slug:
-        query = query.filter(Guide.category_slug == category_slug)
-
-    # Filter by category_id if provided
+    # Handle category filtering
     if category_id:
+        # If category_id is provided, use it directly
         query = query.filter(Guide.category_id == category_id)
+    elif category_slug:
+        # If only category_slug is provided, join with guide_categories table
+        query = query.join(
+            GuideCategory, 
+            Guide.category_id == GuideCategory.id
+        ).filter(GuideCategory.slug == category_slug)
 
     # Get total count before pagination
     total = query.count()
@@ -79,7 +82,6 @@ def get_guides(
     guides = query.order_by(desc(Guide.created_at)).offset(skip).limit(limit).all()
 
     return guides, total
-
 
 def create_guide(db: Session, guide_in: GuideCreate) -> Guide:
     """
