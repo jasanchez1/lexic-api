@@ -49,6 +49,8 @@ class Guide(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+    category_name = Column(String, nullable=True)
+    category_slug = Column(String, nullable=True, index=True)
 
     # Relationship with guide sections
     sections = relationship(

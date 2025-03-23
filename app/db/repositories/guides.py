@@ -1,14 +1,13 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc, asc, or_, and_
+from sqlalchemy import desc
 
 from app.models.analytics import GuideView, GuideViewCount
 from app.models.guide import Guide, GuideSection, guide_related_guides
 from app.schemas.guide import (
     GuideCreate,
     GuideUpdate,
-    GuideSectionCreate,
     GuideSectionUpdate,
     SectionsReorder,
 )
@@ -39,16 +38,24 @@ def get_guide_by_slug(db: Session, slug: str) -> Optional[Guide]:
 
 
 def get_guides(
-    db: Session, skip: int = 0, limit: int = 20, published_only: bool = False
+    db: Session, 
+    skip: int = 0, 
+    limit: int = 20, 
+    published_only: bool = False,
+    category_slug: Optional[str] = None
 ) -> Tuple[List[Guide], int]:
     """
-    Get a list of guides with pagination
+    Get a list of guides with pagination and optional filtering
     Returns guides and total count
     """
     query = db.query(Guide)
 
     if published_only:
         query = query.filter(Guide.published == True)
+        
+    # Filter by category_slug if provided
+    if category_slug:
+        query = query.filter(Guide.category_slug == category_slug)
 
     # Get total count before pagination
     total = query.count()
@@ -273,3 +280,50 @@ def reorder_sections(
         .order_by(GuideSection.display_order)
         .all()
     )
+
+
+def get_guide_categories(db: Session) -> List[dict]:
+    """
+    Get all unique guide categories with counts
+    """
+    from sqlalchemy import func
+
+    # Query for unique categories with counts
+    categories = (
+        db.query(
+            Guide.category_slug,
+            Guide.category_name,
+            func.count(Guide.id).label("guide_count"),
+        )
+        .filter(Guide.published == True, Guide.category_slug != None)
+        .group_by(Guide.category_slug, Guide.category_name)
+        .order_by(Guide.category_name)
+        .all()
+    )
+
+    result = []
+    for slug, name, count in categories:
+        if slug and name:  # Ensure we have valid data
+            result.append({"slug": slug, "name": name, "guide_count": count})
+
+    return result
+
+
+def get_guide_category_info(db: Session, category_slug: str) -> Optional[Dict]:
+    """
+    Get guide category info from a sample guide
+    """
+    guide = (
+        db.query(Guide)
+        .filter(Guide.published == True, Guide.category_slug == category_slug)
+        .first()
+    )
+
+    if not guide:
+        return None
+
+    return {
+        "id": category_slug,  # Using slug as ID
+        "name": guide.category_name,
+        "slug": guide.category_slug,
+    }

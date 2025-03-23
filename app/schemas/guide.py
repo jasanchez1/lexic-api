@@ -3,16 +3,18 @@ from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field
 
+
 # Guide Section schemas
 class GuideSectionBase(BaseModel):
-    section_id: str  # e.g., "que-es", "procedimiento"
+    section_id: str
     title: str
-    content: str  # HTML content
+    content: str
     display_order: int = 0
     always_open: bool = False
 
 class GuideSectionCreate(GuideSectionBase):
     pass
+
 
 class GuideSectionUpdate(BaseModel):
     section_id: Optional[str] = None
@@ -21,25 +23,30 @@ class GuideSectionUpdate(BaseModel):
     display_order: Optional[int] = None
     always_open: Optional[bool] = None
 
+
 class GuideSectionInDB(GuideSectionBase):
     id: UUID
     guide_id: UUID
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
+
 class GuideSection(GuideSectionInDB):
     pass
+
 
 # Guide Section Reorder schema
 class SectionOrderItem(BaseModel):
     id: UUID
     display_order: int
 
+
 class SectionsReorder(BaseModel):
     section_order: List[SectionOrderItem]
+
 
 # Related Guide schema for responses
 class RelatedGuideBase(BaseModel):
@@ -48,16 +55,21 @@ class RelatedGuideBase(BaseModel):
     slug: str
     description: Optional[str] = None
 
+
 # Guide schemas
 class GuideBase(BaseModel):
     title: str
     slug: Optional[str] = None
     description: Optional[str] = None
     published: bool = False
+    category_name: Optional[str] = None
+    category_slug: Optional[str] = None
+
 
 class GuideCreate(GuideBase):
     sections: List[GuideSectionCreate] = []
     related_guide_ids: List[UUID] = []
+
 
 class GuideUpdate(BaseModel):
     title: Optional[str] = None
@@ -67,20 +79,24 @@ class GuideUpdate(BaseModel):
     sections: Optional[List[GuideSectionCreate]] = None
     related_guide_ids: Optional[List[UUID]] = None
 
+
 class GuideInDB(GuideBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
+
 
 class GuideListItem(GuideInDB):
     pass
 
+
 class GuideDetail(GuideInDB):
     sections: List[GuideSection] = []
     related_guides: List[RelatedGuideBase] = []
+
 
 # List response with pagination
 class GuidesList(BaseModel):
@@ -89,10 +105,12 @@ class GuidesList(BaseModel):
     page: int
     pages: int
 
+
 # Slug check response
 class SlugCheckResponse(BaseModel):
     available: bool
     suggestion: Optional[str] = None
+
 
 # Image upload response
 class ImageUploadResponse(BaseModel):
@@ -100,10 +118,12 @@ class ImageUploadResponse(BaseModel):
     name: str
     size: int
 
+
 # Generic success/error responses
 class SuccessResponse(BaseModel):
     success: bool = True
     data: Optional[dict] = None
+
 
 class ErrorResponse(BaseModel):
     success: bool = False

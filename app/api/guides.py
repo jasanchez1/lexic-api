@@ -24,19 +24,25 @@ async def get_guides(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    published_only: bool = True
+    published_only: bool = True,
+    category_slug: Optional[str] = None  # Add this parameter
 ):
     """
     List all guides with basic information and pagination
     """
     skip = (page - 1) * limit
     
+    # Get guides with optional category filter
     guides, total = guides_repository.get_guides(
-        db, skip=skip, limit=limit, published_only=published_only
+        db, 
+        skip=skip, 
+        limit=limit, 
+        published_only=published_only,
+        category_slug=category_slug
     )
     
     # Calculate total pages
-    pages = (total + limit - 1) // limit  # Ceiling division
+    pages = (total + limit - 1) // limit
     
     return {
         "guides": guides,
@@ -242,3 +248,11 @@ async def upload_image(
         "name": unique_filename,
         "size": file_size
     }
+
+
+@router.get("/categories", response_model=List[dict])
+async def get_guide_categories(db: Session = Depends(get_db)):
+    """
+    Get all unique guide categories with counts
+    """
+    return guides_repository.get_guide_categories(db)

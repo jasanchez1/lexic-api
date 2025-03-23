@@ -3,7 +3,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from app.api import auth, health, areas, lawyers, categories, cities, topics, questions, answers, analytics, guides
+from app.api import (
+    auth,
+    health,
+    areas,
+    lawyers,
+    categories,
+    cities,
+    topics,
+    questions,
+    answers,
+    analytics,
+    guides,
+    featured_items,
+    navigation,
+)
 from app.core.config import settings
 
 app = FastAPI(
@@ -39,3 +53,7 @@ app.include_router(questions.router, prefix="/questions", tags=["questions"])
 app.include_router(answers.router, tags=["answers"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 app.include_router(guides.router, prefix="/guides", tags=["guides"])
+app.include_router(
+    featured_items.router, prefix="/admin/featured-items", tags=["admin"]
+)
+app.include_router(navigation.router, prefix="/navigation", tags=["navigation"])
