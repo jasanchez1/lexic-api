@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = ENVIRONMENT == "development"
+    API_KEY: str = os.getenv("API_KEY")
 
     class Config:
         env_file = ".env"

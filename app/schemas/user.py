@@ -34,6 +34,7 @@ class UserInDB(UserBase):
     is_verified: bool
     created_at: datetime
     updated_at: datetime
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
