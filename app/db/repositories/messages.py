@@ -34,7 +34,7 @@ def create_message(db: Session, message: MessageCreate, lawyer_id: UUID) -> Mess
         name=message.name,
         email=message.email,
         phone=message.phone,
-        message=message.message,
+        message=message.content,
         lawyer_id=lawyer_id,
         user_id=message.user_id,
         read=False,

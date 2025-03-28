@@ -8,7 +8,7 @@ class MessageBase(BaseModel):
     name: str
     email: EmailStr
     phone: Optional[str] = None
-    message: str
+    content: str
 
 
 class MessageCreate(MessageBase):

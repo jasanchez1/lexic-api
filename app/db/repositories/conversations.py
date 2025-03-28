@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc, or_, and_
+from sqlalchemy import desc, or_, and_, func
 
 from app.models.conversation import Conversation, ConversationMessage
 from app.models.lawyer import Lawyer
@@ -138,7 +138,7 @@ def get_unread_count(db: Session, user_id: UUID) -> int:
     result = db.query(Conversation).filter(
         Conversation.user_id == user_id
     ).with_entities(
-        db.func.sum(Conversation.unread_count)
+        func.sum(Conversation.unread_count)
     ).scalar()
     
     return result or 0

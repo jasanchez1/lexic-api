@@ -404,7 +404,7 @@ def seed_lawyer_data():
                         name=message_data["name"],
                         email=message_data["email"],
                         phone=message_data.get("phone"),
-                        message=message_data["message"],
+                        content=message_data["message"],
                         user_id=random_user.id  # Added user_id
                     )
                     
