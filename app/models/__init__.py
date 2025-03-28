@@ -21,3 +21,4 @@ from app.models.analytics import (
     QuestionView, QuestionViewCount
 )
 from app.models.featured_item import FeaturedItem
+from app.models.conversation import Conversation, ConversationMessage

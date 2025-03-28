@@ -30,6 +30,7 @@ class MessageCreateResponse(BaseModel):
     success: bool
     message_id: str
     user_id: UUID
+    conversation_id: Optional[str] = None
 
 
 class CallCreate(BaseModel):
