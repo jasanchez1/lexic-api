@@ -53,6 +53,33 @@ def get_review_stats(db: Session, lawyer_id: UUID) -> ReviewStats:
     )
 
 
+def get_review_stats_by_user(db: Session, user_id: UUID) -> ReviewStats:
+    """
+    Get review statistics for a lawyer
+    """
+    reviews = db.query(Review).filter(Review.user_id == user_id).all()
+
+    if not reviews:
+        return ReviewStats(
+            average=0.0, total=0, distribution={"5": 0, "4": 0, "3": 0, "2": 0, "1": 0}
+        )
+
+    total = len(reviews)
+    average = sum(review.rating for review in reviews) / total if total > 0 else 0
+
+    # Calculate distribution
+    distribution = {"5": 0, "4": 0, "3": 0, "2": 0, "1": 0}
+    for review in reviews:
+        distribution[str(review.rating)] = distribution.get(str(review.rating), 0) + 1
+
+    # Convert to percentages
+    distribution = {k: round(v / total * 100) for k, v in distribution.items()}
+
+    return ReviewStats(
+        average=round(average, 1), total=total, distribution=distribution
+    )
+
+
 def create_review(db: Session, review: ReviewCreate, lawyer_id: UUID) -> Review:
     """
     Create a new review
@@ -98,3 +125,15 @@ def delete_review(db: Session, review_id: UUID) -> None:
         db.delete(review)
         db.commit()
     return None
+
+
+def get_reviews_by_user(db: Session, user_id: UUID) -> List[Review]:
+    """
+    Get all reviews by a user
+    """
+    return (
+        db.query(Review)
+        .filter(Review.user_id == user_id)
+        .order_by(Review.created_at.desc())
+        .all()
+    )

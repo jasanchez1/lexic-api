@@ -17,7 +17,8 @@ from app.api import (
     guides,
     featured_items,
     navigation,
-    conversations,  # Add new conversations router
+    conversations,
+    users,  # Add new conversations router
 )
 from app.core.config import settings
 
@@ -59,3 +60,4 @@ app.include_router(
 )
 app.include_router(navigation.router, prefix="/navigation", tags=["navigation"])
 app.include_router(conversations.router, prefix="/conversations", tags=["conversations"])
+app.include_router(users.router, prefix="/users", tags=["users"])
