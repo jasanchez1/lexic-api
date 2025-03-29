@@ -50,7 +50,7 @@ def update_user(db: Session, user: User, user_in: UserUpdate) -> User:
     """
     Update a user
     """
-    update_data = user_in.dict(exclude_unset=True)
+    update_data = user_in.model_dump(exclude_unset=True)
     
     for key, value in update_data.items():
         setattr(user, key, value)

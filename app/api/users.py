@@ -6,7 +6,7 @@ from app.api.dependencies import get_current_user
 from app.db.database import get_db
 from app.db.repositories import users as users_repository
 from app.schemas.review import ReviewAuthor, ReviewResponse, ReviewsResponse
-from app.schemas.user import User
+from app.schemas.user import User, UserUpdate
 import app.db.repositories.reviews as reviews_repository
 
 
@@ -28,7 +28,7 @@ async def get_users(
 @router.patch("/{user_id}", response_model=User)
 async def update_user(
     user_id: UUID,
-    user: User,
+    user: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -42,7 +42,7 @@ async def update_user(
         )
 
     # Update user
-    updated_user = users_repository.update_user(db, user_id, user)
+    updated_user = users_repository.update_user(db, current_user, user)
 
     if not updated_user:
         raise HTTPException(status_code=404, detail="User not found")
