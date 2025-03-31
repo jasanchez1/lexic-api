@@ -34,7 +34,8 @@ def search_lawyers(
     query: Optional[str] = None,
     sort: str = "best_match",
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    user_id: Optional[UUID] = None
 ) -> Tuple[List[Dict], int]:
     """
     Search lawyers with various filters
@@ -62,6 +63,10 @@ def search_lawyers(
     if city:
         filters.append(LawyerModel.city.ilike(f"%{city}%"))
     
+    # Filter by user_id
+    if user_id:
+        filters.append(LawyerModel.user_id == user_id)
+        
     # Text search
     if query:
         text_filters = [

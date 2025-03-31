@@ -11,7 +11,6 @@ from app.db.repositories import areas as areas_repository
 from app.db.repositories import analytics as analytics_repository
 from app.schemas.analytics import (
     ProfileViewCreate,
-    ListingClickCreate,
     ProfileImpressionCreate,
 )
 from app.schemas.lawyer import (
@@ -42,6 +41,7 @@ async def search_lawyers(
     sort: str = "best_match",
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
+    user_id: Optional[UUID] = None,
     current_user: Optional[User] = Depends(get_optional_current_user),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
@@ -57,7 +57,8 @@ async def search_lawyers(
         query=q, 
         sort=sort, 
         skip=skip, 
-        limit=size
+        limit=size,
+        user_id=user_id,
     )
     
     # Track profile impressions asynchronously for each lawyer in the search results
