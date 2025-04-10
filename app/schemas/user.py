@@ -35,6 +35,7 @@ class UserInDB(UserBase):
     created_at: datetime
     updated_at: datetime
     is_admin: bool = False
+    lawyer_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True

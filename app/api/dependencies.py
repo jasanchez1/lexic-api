@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.exceptions import InvalidCredentialsException, InvalidTokenException, TokenExpiredException
 from app.db.database import get_db
 from app.db.repositories.users import get_user_by_id
+from app.db.repositories.lawyers import get_lawyer_by_user_id
 from app.models.user import User
 from app.schemas.token import TokenPayload
 
@@ -46,6 +47,10 @@ def get_current_user(
         
     if not user.is_active:
         raise InvalidCredentialsException()
+    
+    # Get lawyer_id if user has a lawyer profile
+    lawyer = get_lawyer_by_user_id(db, user.id)
+    user.lawyer_id = lawyer.id if lawyer else None
         
     return user
 
