@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:8000",
         "https://lexic.cl",
+        "https://lawyers.lexic.cl",
+        "https://lexic-lawyers.pages.dev",
         "https://staging-lexic.pages.dev"
     ]
     
