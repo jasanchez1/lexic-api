@@ -21,5 +21,5 @@ class User(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     is_admin = Column(Boolean, default=False)
+    is_lawyer = Column(Boolean, default=False)
     
-    # The relationship is defined in the Lawyer model with backref
