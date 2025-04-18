@@ -50,19 +50,15 @@ class Guide(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     
-    # New category relationship
     category_id = Column(UUID(as_uuid=True), ForeignKey("guide_categories.id", ondelete="SET NULL"), nullable=True)
     category = relationship("GuideCategory", back_populates="guides")
 
-    # Relationship with guide sections
     sections = relationship(
         "GuideSection", back_populates="guide", cascade="all, delete-orphan"
     )
     guide_views = relationship(
         "GuideView", back_populates="guide", passive_deletes=True
     )
-
-    # Relationship with related guides
     related_guides = relationship(
         "Guide",
         secondary=guide_related_guides,
@@ -73,7 +69,6 @@ class Guide(Base):
     view_count = relationship(
         "GuideViewCount", cascade="all, delete-orphan", passive_deletes=True
     )
-
 
 class GuideSection(Base):
     __tablename__ = "guide_sections"

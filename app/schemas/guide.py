@@ -77,10 +77,6 @@ class GuideBase(BaseModel):
     description: Optional[str] = None
     published: bool = False
     category_id: Optional[UUID] = None
-    
-    # Legacy fields (to be removed after transition)
-    category_name: Optional[str] = None
-    category_slug: Optional[str] = None
 
 
 class GuideCreate(GuideBase):

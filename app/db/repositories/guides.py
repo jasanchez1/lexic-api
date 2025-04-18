@@ -70,10 +70,9 @@ def get_guides(
         query = query.filter(Guide.category_id == category_id)
     elif category_slug:
         # If only category_slug is provided, join with guide_categories table
-        query = query.join(
-            GuideCategory, 
-            Guide.category_id == GuideCategory.id
-        ).filter(GuideCategory.slug == category_slug)
+        query = query.join(GuideCategory, Guide.category_id == GuideCategory.id).filter(
+            GuideCategory.slug == category_slug
+        )
 
     # Get total count before pagination
     total = query.count()
@@ -82,6 +81,7 @@ def get_guides(
     guides = query.order_by(desc(Guide.created_at)).offset(skip).limit(limit).all()
 
     return guides, total
+
 
 def create_guide(db: Session, guide_in: GuideCreate) -> Guide:
     """
@@ -96,27 +96,11 @@ def create_guide(db: Session, guide_in: GuideCreate) -> Guide:
 
         guide_data["slug"] = slugify(guide_data["title"])
 
-    # Handle category_id and legacy fields
-    if guide_data.get("category_id"):
-        # If category_id is provided, get category details for legacy fields
-        category = (
-            db.query(GuideCategory)
-            .filter(GuideCategory.id == guide_data["category_id"])
-            .first()
-        )
-        if category:
-            guide_data["category_name"] = category.name
-            guide_data["category_slug"] = category.slug
-    elif guide_data.get("category_slug"):
-        # If only category_slug is provided, look up the category_id
-        category = (
-            db.query(GuideCategory)
-            .filter(GuideCategory.slug == guide_data["category_slug"])
-            .first()
-        )
-        if category:
-            guide_data["category_id"] = category.id
-            guide_data["category_name"] = category.name
+    # Create guide with only valid fields
+    if "category_name" in guide_data:
+        del guide_data["category_name"]
+    if "category_slug" in guide_data:
+        del guide_data["category_slug"]
 
     db_guide = Guide(**guide_data)
     db.add(db_guide)
