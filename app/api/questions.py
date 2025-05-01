@@ -27,6 +27,9 @@ async def get_questions(
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
     sort: str = "latest",
+    answered: Optional[bool] = None,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """
     List all legal questions with optional filtering
@@ -53,6 +56,7 @@ async def get_questions(
         topic_id=topic_id,
         topic_slug=topic_slug,
         sort=sort,
+        answered=answered,
     )
 
     # Calculate total pages
@@ -69,9 +73,12 @@ async def get_questions(
 
         # Format author info
         author = {
-            "name": f"{question.user.first_name or ''} {question.user.last_name or ''}".strip(),
+            "name": "Anonymous",
             "location": question.location or "Unknown",
         }
+        # Only try to access user properties if the user exists
+        if question.user:
+            author["name"] = f"{question.user.first_name or ''} {question.user.last_name or ''}".strip() or "Anonymous"
 
         response_questions.append(
             QuestionResponse(
@@ -189,7 +196,6 @@ async def create_question(
 
     # Create the question
     db_question = questions_repository.create_question(db, question, current_user_id)
-
 
     return QuestionResponse(
         **{
