@@ -18,7 +18,8 @@ from app.api import (
     featured_items,
     navigation,
     conversations,
-    users,  # Add new conversations router
+    users,
+    documents
 )
 from app.core.config import settings
 
