@@ -174,7 +174,6 @@ async def get_lawyer_documents(
         "data": {
             "lawyer_id": str(lawyer_id),
             "documents": document_responses,
-            "verification_status": lawyer.verification_status
         }
     }
 
