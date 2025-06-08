@@ -319,3 +319,24 @@ router.include_router(reviews_router, prefix="")
 router.include_router(experience_router, prefix="")
 router.include_router(messages_router, prefix="")
 router.include_router(documents_router.router, prefix="")
+
+
+@router.put("/{lawyer_id}/verify", response_model=Lawyer)
+async def verify_lawyer(
+    lawyer_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Verify a lawyer profile
+    """
+    db_lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
+    if db_lawyer is None:
+        raise HTTPException(status_code=404, detail="Lawyer not found")
+
+    # Only allow verification if the lawyer is not already verified
+    if db_lawyer.is_verified:
+        raise HTTPException(status_code=400, detail="Lawyer is already verified")
+
+    verified_lawyer = lawyers_repository.verify_lawyer(db, db_lawyer)
+
+    return verified_lawyer

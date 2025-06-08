@@ -246,3 +246,16 @@ def update_lawyer_review_score(db: Session, lawyer_id: UUID, rating: int) -> Non
     )
     db.commit()
     return None
+
+
+def verify_lawyer(db: Session, lawyer_id: UUID) -> LawyerModel:
+    """
+    Verify a lawyer's profile
+    """
+    lawyer = db.query(LawyerModel).filter(LawyerModel.id == lawyer_id).first()
+    if lawyer:
+        lawyer.is_verified = True
+        db.add(lawyer)
+        db.commit()
+        db.refresh(lawyer)
+    return lawyer
