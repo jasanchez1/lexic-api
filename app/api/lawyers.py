@@ -107,20 +107,23 @@ async def get_lawyer(
     if db_lawyer is None:
         raise HTTPException(status_code=404, detail="Lawyer not found")
 
-    # Track profile view in analytics
-    view_data = {
-        "lawyer_id": lawyer_id,
-        "user_id": current_user.id if current_user else None,
-        "source": source,
-        "timestamp": datetime.now(),
-    }
+    # If it's not the lawyer itself, track the profile view
+    if current_user and db_lawyer.user_id != current_user.id:
 
-    # Perform tracking asynchronously via background task
-    background_tasks.add_task(
-        analytics_repository.create_profile_view,
-        db=db,
-        view=ProfileViewCreate(**view_data),
-    )
+        # Track profile view in analytics
+        view_data = {
+            "lawyer_id": lawyer_id,
+            "user_id": current_user.id if current_user else None,
+            "source": source,
+            "timestamp": datetime.now(),
+        }
+
+        # Perform tracking asynchronously via background task
+        background_tasks.add_task(
+            analytics_repository.create_profile_view,
+            db=db,
+            view=ProfileViewCreate(**view_data),
+        )
 
     # Process the lawyer's areas to match LawyerPracticeArea format
     area_scores = (
