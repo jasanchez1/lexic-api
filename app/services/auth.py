@@ -38,7 +38,8 @@ def signup(db: Session, data: SignUp) -> TokenResponse:
         email=data.email,
         password=data.password,
         first_name=data.first_name,
-        last_name=data.last_name
+        last_name=data.last_name,
+        is_lawyer=data.is_lawyer
     )
     user = create_user(db, user_in)
     

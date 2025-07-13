@@ -13,6 +13,7 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    is_lawyer: bool = False
 
 
 class UserUpdate(BaseModel):

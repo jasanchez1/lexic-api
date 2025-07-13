@@ -11,6 +11,7 @@ class SignUp(BaseModel):
     password: str = Field(..., min_length=8)
     first_name: str
     last_name: str
+    is_lawyer: bool = False
 
 
 class TokenResponse(BaseModel):

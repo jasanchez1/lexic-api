@@ -39,6 +39,7 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         hashed_password=hashed_password,
         first_name=user_in.first_name,
         last_name=user_in.last_name,
+        is_lawyer=user_in.is_lawyer,
     )
     db.add(db_user)
     db.commit()
