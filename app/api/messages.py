@@ -53,11 +53,21 @@ async def send_message_to_lawyer(
         )
         conversation = conversations_repository.create_conversation(db, conversation_data)
     
+    # Get lawyer's user_id for the message
+    lawyer_user_id = lawyer.user_id if lawyer.user_id else None
+    if not lawyer_user_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Lawyer does not have an associated user account"
+        )
+    
     # Create the message
     db_message = conversations_repository.create_message(
         db, 
         message, 
         conversation.id, 
+        user_id_from=current_user.id,
+        user_id_to=lawyer_user_id,
         from_lawyer=False
     )
 

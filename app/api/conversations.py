@@ -30,25 +30,27 @@ async def list_user_conversations(
     """
     List all conversations for the authenticated user, ordered by most recent message
     """
-    # Get user's conversations
-    conversations = conversations_repository.get_conversations_for_user(db, current_user.id)
+    # Get all conversations where current user is either participant
+    conversations = conversations_repository.get_conversations_for_any_user(db, current_user.id)
     
     # Format the response
     response = []
     for conversation in conversations:
-        # Prepare lawyer data
-        lawyer_data = {
-            "id": conversation.lawyer.id,
-            "name": conversation.lawyer.name,
-            "title": conversation.lawyer.title,
-            "image_url": conversation.lawyer.image_url
+        # Determine the other participant
+        other_user = conversation.user if conversation.user.id != current_user.id else conversation.lawyer
+        
+        # Create response with other participant info
+        other_user_data = {
+            "id": other_user.id,
+            "name": getattr(other_user, 'name', None) or f"{getattr(other_user, 'first_name', '')} {getattr(other_user, 'last_name', '')}" or other_user.email,
+            "title": getattr(other_user, 'title', 'User'),
+            "image_url": getattr(other_user, 'image_url', None)
         }
         
-        # Create conversation response
         response.append(
             ConversationResponse(
                 id=conversation.id,
-                lawyer=lawyer_data,
+                lawyer=other_user_data,  # Keep field name for compatibility
                 last_message=conversation.last_message,
                 last_message_date=conversation.last_message_date,
                 unread_count=conversation.unread_count
@@ -71,8 +73,12 @@ async def get_conversation_messages(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Verify the current user is part of the conversation
-    if conversation.user_id != current_user.id:
+    # Verify the current user is part of the conversation (either as user or as lawyer)
+    is_participant = (
+        conversation.user_id == current_user.id or 
+        (conversation.lawyer and conversation.lawyer.user_id == current_user.id)
+    )
+    if not is_participant:
         raise HTTPException(status_code=403, detail="Not authorized to access this conversation")
     
     # Get messages
@@ -80,7 +86,11 @@ async def get_conversation_messages(
     
     # Track message read event
     for message in messages:
-        if message.from_lawyer and not message.read:
+        # Use new method to check if message is from lawyer
+        lawyer_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
+        is_from_lawyer = message.is_from_lawyer(lawyer_user_id) if lawyer_user_id else message.from_lawyer
+        
+        if is_from_lawyer and not message.read:
             # Track in analytics
             event_data = MessageEventCreate(
                 lawyer_id=conversation.lawyer_id,
@@ -110,15 +120,38 @@ async def send_reply_in_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Verify the current user is part of the conversation
-    if conversation.user_id != current_user.id:
+    # Verify the current user is part of the conversation (either as user or as lawyer)
+    is_participant = (
+        conversation.user_id == current_user.id or 
+        (conversation.lawyer and conversation.lawyer.user_id == current_user.id)
+    )
+    if not is_participant:
         raise HTTPException(status_code=403, detail="Not authorized to send messages in this conversation")
     
     # Set user_id from current user
     message.user_id = current_user.id
     
+    # Determine the recipient (the other participant in the conversation)
+    if conversation.user_id == current_user.id:
+        # Current user is the client, send to lawyer
+        recipient_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
+        if not recipient_user_id:
+            raise HTTPException(status_code=400, detail="Lawyer does not have an associated user account")
+        is_from_lawyer = False
+    else:
+        # Current user is the lawyer, send to client
+        recipient_user_id = conversation.user_id
+        is_from_lawyer = True
+    
     # Create the message
-    db_message = conversations_repository.create_message(db, message, conversation_id, from_lawyer=False)
+    db_message = conversations_repository.create_message(
+        db, 
+        message, 
+        conversation_id, 
+        user_id_from=current_user.id,
+        user_id_to=recipient_user_id,
+        from_lawyer=is_from_lawyer
+    )
     
     # Track message sent event
     event_data = MessageEventCreate(
@@ -164,8 +197,23 @@ async def send_initial_message_to_lawyer(
         )
         conversation = conversations_repository.create_conversation(db, conversation_data)
     
+    # Get lawyer's user_id for the message  
+    lawyer_user_id = lawyer.user_id if lawyer.user_id else None
+    if not lawyer_user_id:
+        raise HTTPException(
+            status_code=400, 
+            detail="Lawyer does not have an associated user account"
+        )
+    
     # Create the message
-    db_message = conversations_repository.create_message(db, message, conversation.id, from_lawyer=False)
+    db_message = conversations_repository.create_message(
+        db, 
+        message, 
+        conversation.id, 
+        user_id_from=current_user.id,
+        user_id_to=lawyer_user_id,
+        from_lawyer=False
+    )
     
     # Track message sent event
     event_data = MessageEventCreate(

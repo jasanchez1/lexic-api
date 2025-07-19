@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:8000",
         "https://lexic.cl",
         "https://lawyers.lexic.cl",

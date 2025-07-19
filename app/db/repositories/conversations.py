@@ -1,5 +1,6 @@
 from typing import List, Optional, Tuple
 from uuid import UUID
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, or_, and_, func
 
@@ -29,12 +30,31 @@ def get_conversation_by_user_and_lawyer(db: Session, user_id: UUID, lawyer_id: U
 
 def get_conversations_for_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[Conversation]:
     """
-    Get all conversations for a user
+    Get all conversations for a user (as client)
     """
     return db.query(Conversation).options(
         joinedload(Conversation.lawyer)
     ).filter(
         Conversation.user_id == user_id
+    ).order_by(
+        desc(Conversation.last_message_date)
+    ).offset(skip).limit(limit).all()
+
+def get_conversations_for_any_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[Conversation]:
+    """
+    Get all conversations where user is either participant (user_id or lawyer with this user_id)
+    """
+    return db.query(Conversation).options(
+        joinedload(Conversation.user),
+        joinedload(Conversation.lawyer)
+    ).filter(
+        or_(
+            Conversation.user_id == user_id,
+            and_(
+                Conversation.lawyer.has(),
+                Conversation.lawyer.has(user_id=user_id)
+            )
+        )
     ).order_by(
         desc(Conversation.last_message_date)
     ).offset(skip).limit(limit).all()
@@ -69,7 +89,9 @@ def create_message(
     db: Session, 
     message: MessageCreate, 
     conversation_id: UUID, 
-    from_lawyer: bool = False
+    user_id_from: UUID,
+    user_id_to: UUID,
+    from_lawyer: bool = False  # Keep for backward compatibility
 ) -> ConversationMessage:
     """
     Create a new message in a conversation
@@ -78,7 +100,9 @@ def create_message(
     db_message = ConversationMessage(
         conversation_id=conversation_id,
         content=message.content,
-        from_lawyer=from_lawyer,
+        user_id_from=user_id_from,
+        user_id_to=user_id_to,
+        from_lawyer=from_lawyer,  # Keep for backward compatibility
         read=from_lawyer  # Messages from the user are marked as read by default
     )
     db.add(db_message)
@@ -87,10 +111,14 @@ def create_message(
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if conversation:
         conversation.last_message = message.content
-        conversation.last_message_date = db_message.timestamp
+        conversation.last_message_date = db_message.timestamp or datetime.now(timezone.utc)
         
         # Increment unread count if message is from lawyer
-        if from_lawyer:
+        # Check using new user_id fields first, then fallback to from_lawyer
+        lawyer_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
+        is_from_lawyer = (lawyer_user_id and user_id_from == lawyer_user_id) or from_lawyer
+        
+        if is_from_lawyer:
             conversation.unread_count += 1
             
         db.add(conversation)
@@ -114,14 +142,27 @@ def mark_conversation_as_read(db: Session, conversation_id: UUID, user_id: UUID)
     if not conversation:
         return None
     
-    # Mark messages from lawyer as read
-    db.query(ConversationMessage).filter(
-        and_(
-            ConversationMessage.conversation_id == conversation_id,
-            ConversationMessage.from_lawyer == True,
-            ConversationMessage.read == False
-        )
-    ).update({"read": True})
+    # Get the lawyer's user_id for more precise filtering
+    lawyer_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
+    
+    if lawyer_user_id:
+        # Mark messages from lawyer as read using user_id_from
+        db.query(ConversationMessage).filter(
+            and_(
+                ConversationMessage.conversation_id == conversation_id,
+                ConversationMessage.user_id_from == lawyer_user_id,
+                ConversationMessage.read == False
+            )
+        ).update({"read": True})
+    else:
+        # Fallback to from_lawyer field for backward compatibility
+        db.query(ConversationMessage).filter(
+            and_(
+                ConversationMessage.conversation_id == conversation_id,
+                ConversationMessage.from_lawyer == True,
+                ConversationMessage.read == False
+            )
+        ).update({"read": True})
     
     # Reset unread count
     conversation.unread_count = 0
