@@ -10,7 +10,6 @@ from app.db.repositories import conversations as conversations_repository
 from app.db.repositories import analytics as analytics_repository
 from app.schemas.analytics import MessageEventCreate
 from app.schemas.message import MessageCreate, MessageCreateResponse
-from app.schemas.conversation import ConversationCreate
 from app.api.dependencies import get_current_user
 from app.models.user import User
 
@@ -40,35 +39,31 @@ async def send_message_to_lawyer(
             detail="User ID in message must match the authenticated user",
         )
 
-    # Check if a conversation already exists
-    conversation = conversations_repository.get_conversation_by_user_and_lawyer(
-        db, current_user.id, lawyer_id
-    )
-    
-    if not conversation:
-        # Create a new conversation
-        conversation_data = ConversationCreate(
-            user_id=current_user.id,
-            lawyer_id=lawyer_id
-        )
-        conversation = conversations_repository.create_conversation(db, conversation_data)
-    
-    # Get lawyer's user_id for the message
+    # Get lawyer's user_id first
     lawyer_user_id = lawyer.user_id if lawyer.user_id else None
     if not lawyer_user_id:
         raise HTTPException(
             status_code=400, 
             detail="Lawyer does not have an associated user account"
         )
+
+    # Check if a conversation already exists
+    conversation = conversations_repository.get_conversation_by_participants(
+        db, current_user.id, lawyer_user_id
+    )
+    
+    if not conversation:
+        # Create a new conversation
+        conversation = conversations_repository.create_conversation(
+            db, current_user.id, lawyer_user_id
+        )
     
     # Create the message
     db_message = conversations_repository.create_message(
         db, 
-        message, 
         conversation.id, 
-        user_id_from=current_user.id,
-        user_id_to=lawyer_user_id,
-        from_lawyer=False
+        current_user.id,
+        message.content
     )
 
     # Track message sent event via analytics

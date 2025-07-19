@@ -12,28 +12,38 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    lawyer_id = Column(UUID(as_uuid=True), ForeignKey("lawyers.id", ondelete="CASCADE"), nullable=False)
+    participant_1_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    participant_2_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     last_message = Column(Text, nullable=True)
     last_message_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    unread_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    user = relationship("app.models.user.User", foreign_keys=[user_id], backref="conversations")
-    lawyer = relationship("app.models.lawyer.Lawyer", foreign_keys=[lawyer_id], backref="conversations")
+    participant_1 = relationship("app.models.user.User", foreign_keys=[participant_1_id])
+    participant_2 = relationship("app.models.user.User", foreign_keys=[participant_2_id])
     messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
+    
+    def get_other_participant(self, current_user_id: PyUUID):
+        """Get the other participant in the conversation"""
+        if self.participant_1_id == current_user_id:
+            return self.participant_2
+        elif self.participant_2_id == current_user_id:
+            return self.participant_1
+        else:
+            return None
+    
+    def is_participant(self, user_id: PyUUID) -> bool:
+        """Check if user is a participant in this conversation"""
+        return user_id in [self.participant_1_id, self.participant_2_id]
 
 class ConversationMessage(Base):
     __tablename__ = "conversation_messages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     content = Column(Text, nullable=False)
-    user_id_from = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    user_id_to = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    from_lawyer = Column(Boolean, default=False)  # Keep for backward compatibility during transition
     read = Column(Boolean, default=False)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -41,19 +51,8 @@ class ConversationMessage(Base):
 
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
-    sender = relationship("app.models.user.User", foreign_keys=[user_id_from])
-    recipient = relationship("app.models.user.User", foreign_keys=[user_id_to])
+    sender = relationship("app.models.user.User", foreign_keys=[sender_id])
     
-    def is_from_lawyer(self, lawyer_user_id: PyUUID) -> bool:
-        """Check if this message is from a lawyer by comparing sender with lawyer's user_id"""
-        if self.user_id_from:
-            return self.user_id_from == lawyer_user_id
-        # Fallback to existing from_lawyer field for backward compatibility
-        return self.from_lawyer
-    
-    def is_to_lawyer(self, lawyer_user_id: PyUUID) -> bool:
-        """Check if this message is to a lawyer by comparing recipient with lawyer's user_id"""
-        if self.user_id_to:
-            return self.user_id_to == lawyer_user_id
-        # Fallback to inverse of from_lawyer field for backward compatibility
-        return not self.from_lawyer
+    def is_from_me(self, current_user_id: PyUUID) -> bool:
+        """Check if this message was sent by the current user"""
+        return self.sender_id == current_user_id

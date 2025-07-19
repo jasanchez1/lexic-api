@@ -9,10 +9,9 @@ from app.db.repositories import lawyers as lawyers_repository
 from app.db.repositories import analytics as analytics_repository
 from app.schemas.conversation import (
     ConversationResponse, 
-    ConversationList, 
     MessageResponse, 
-    MessageList,
     MessageCreate,
+    ParticipantData,
     SuccessResponse
 )
 from app.schemas.analytics import MessageEventCreate
@@ -30,32 +29,32 @@ async def list_user_conversations(
     """
     List all conversations for the authenticated user, ordered by most recent message
     """
-    # Get all conversations where current user is either participant
-    conversations = conversations_repository.get_conversations_for_any_user(db, current_user.id)
+    conversations = conversations_repository.get_conversations_for_user(db, current_user.id)
     
-    # Format the response
     response = []
     for conversation in conversations:
-        # Determine the other participant
-        other_user = conversation.user if conversation.user.id != current_user.id else conversation.lawyer
+        # Get the other participant
+        other_participant = conversation.get_other_participant(current_user.id)
         
-        # Create response with other participant info
-        other_user_data = {
-            "id": other_user.id,
-            "name": getattr(other_user, 'name', None) or f"{getattr(other_user, 'first_name', '')} {getattr(other_user, 'last_name', '')}" or other_user.email,
-            "title": getattr(other_user, 'title', 'User'),
-            "image_url": getattr(other_user, 'image_url', None)
-        }
-        
-        response.append(
-            ConversationResponse(
-                id=conversation.id,
-                lawyer=other_user_data,  # Keep field name for compatibility
-                last_message=conversation.last_message,
-                last_message_date=conversation.last_message_date,
-                unread_count=conversation.unread_count
+        if other_participant:
+            # Create participant data with fallback logic for different user types
+            participant_data = ParticipantData(
+                id=other_participant.id,
+                name=getattr(other_participant, 'name', None) or 
+                     f"{getattr(other_participant, 'first_name', '')} {getattr(other_participant, 'last_name', '')}".strip() or 
+                     other_participant.email,
+                title=getattr(other_participant, 'title', 'User'),
+                image_url=getattr(other_participant, 'image_url', None)
             )
-        )
+            
+            response.append(
+                ConversationResponse(
+                    id=conversation.id,
+                    other_participant=participant_data,
+                    last_message=conversation.last_message,
+                    last_message_date=conversation.last_message_date
+                )
+            )
     
     return response
 
@@ -68,42 +67,36 @@ async def get_conversation_messages(
     """
     Get all messages for a specific conversation
     """
-    # Get the conversation
     conversation = conversations_repository.get_conversation_by_id(db, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Verify the current user is part of the conversation (either as user or as lawyer)
-    is_participant = (
-        conversation.user_id == current_user.id or 
-        (conversation.lawyer and conversation.lawyer.user_id == current_user.id)
-    )
-    if not is_participant:
+    # Check if user is a participant
+    if not conversation.is_participant(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to access this conversation")
     
     # Get messages
     messages = conversations_repository.get_messages_by_conversation(db, conversation_id)
     
-    # Track message read event
-    for message in messages:
-        # Use new method to check if message is from lawyer
-        lawyer_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
-        is_from_lawyer = message.is_from_lawyer(lawyer_user_id) if lawyer_user_id else message.from_lawyer
-        
-        if is_from_lawyer and not message.read:
-            # Track in analytics
-            event_data = MessageEventCreate(
-                lawyer_id=conversation.lawyer_id,
-                user_id=current_user.id,
-                status="read",
-                timestamp=datetime.now()
-            )
-            analytics_repository.create_message_event(db, event_data)
-    
-    # Mark conversation as read
+    # Mark conversation as read (mark messages from others as read)
     conversations_repository.mark_conversation_as_read(db, conversation_id, current_user.id)
     
-    return messages
+    # Format response with is_from_me
+    response = []
+    for message in messages:
+        response.append(
+            MessageResponse(
+                id=message.id,
+                conversation_id=message.conversation_id,
+                sender_id=message.sender_id,
+                content=message.content,
+                is_from_me=message.is_from_me(current_user.id),
+                read=message.read,
+                timestamp=message.timestamp
+            )
+        )
+    
+    return response
 
 @router.post("/{conversation_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_reply_in_conversation(
@@ -113,124 +106,80 @@ async def send_reply_in_conversation(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Send a new message in an existing conversation
+    Send a new message in an existing conversation - SIMPLE!
     """
-    # Get the conversation
     conversation = conversations_repository.get_conversation_by_id(db, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    # Verify the current user is part of the conversation (either as user or as lawyer)
-    is_participant = (
-        conversation.user_id == current_user.id or 
-        (conversation.lawyer and conversation.lawyer.user_id == current_user.id)
-    )
-    if not is_participant:
+    # Check if user is a participant
+    if not conversation.is_participant(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to send messages in this conversation")
     
-    # Set user_id from current user
-    message.user_id = current_user.id
-    
-    # Determine the recipient (the other participant in the conversation)
-    if conversation.user_id == current_user.id:
-        # Current user is the client, send to lawyer
-        recipient_user_id = conversation.lawyer.user_id if conversation.lawyer and conversation.lawyer.user_id else None
-        if not recipient_user_id:
-            raise HTTPException(status_code=400, detail="Lawyer does not have an associated user account")
-        is_from_lawyer = False
-    else:
-        # Current user is the lawyer, send to client
-        recipient_user_id = conversation.user_id
-        is_from_lawyer = True
-    
-    # Create the message
+    # Create the message - super simple!
     db_message = conversations_repository.create_message(
         db, 
-        message, 
         conversation_id, 
-        user_id_from=current_user.id,
-        user_id_to=recipient_user_id,
-        from_lawyer=is_from_lawyer
+        current_user.id,  # sender
+        message.content
     )
     
-    # Track message sent event
-    event_data = MessageEventCreate(
-        lawyer_id=conversation.lawyer_id,
-        user_id=current_user.id,
-        status="sent",
-        timestamp=datetime.now()
+    return MessageResponse(
+        id=db_message.id,
+        conversation_id=db_message.conversation_id,
+        sender_id=db_message.sender_id,
+        content=db_message.content,
+        is_from_me=True,  # Always true since current user sent it
+        read=db_message.read,
+        timestamp=db_message.timestamp
     )
-    analytics_repository.create_message_event(db, event_data)
-    
-    return db_message
 
-@router.post("/lawyers/{lawyer_id}/messages", status_code=status.HTTP_201_CREATED)
-async def send_initial_message_to_lawyer(
+@router.post("/lawyers/{lawyer_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+async def send_message_to_lawyer(
     lawyer_id: UUID,
     message: MessageCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Send a new message to a lawyer, creating a conversation if one doesn't exist.
-    This is used for the initial contact with a lawyer.
+    Send a message to a lawyer - creates conversation if it doesn't exist
     """
-    # Verify lawyer exists
+    # Get lawyer and their user_id
     lawyer = lawyers_repository.get_lawyer_by_id(db, lawyer_id)
     if not lawyer:
         raise HTTPException(status_code=404, detail="Lawyer not found")
     
-    # Set user_id from current user
-    message.user_id = current_user.id
+    if not lawyer.user_id:
+        raise HTTPException(status_code=400, detail="Lawyer does not have an associated user account")
     
-    # Check if a conversation already exists
-    conversation = conversations_repository.get_conversation_by_user_and_lawyer(
-        db, current_user.id, lawyer_id
+    # Check if conversation already exists between current user and lawyer's user account
+    conversation = conversations_repository.get_conversation_by_participants(
+        db, current_user.id, lawyer.user_id
     )
     
     if not conversation:
-        # Create a new conversation
-        from app.schemas.conversation import ConversationCreate
-        conversation_data = ConversationCreate(
-            user_id=current_user.id,
-            lawyer_id=lawyer_id
-        )
-        conversation = conversations_repository.create_conversation(db, conversation_data)
-    
-    # Get lawyer's user_id for the message  
-    lawyer_user_id = lawyer.user_id if lawyer.user_id else None
-    if not lawyer_user_id:
-        raise HTTPException(
-            status_code=400, 
-            detail="Lawyer does not have an associated user account"
+        # Create new conversation between current user and lawyer's user account
+        conversation = conversations_repository.create_conversation(
+            db, current_user.id, lawyer.user_id
         )
     
     # Create the message
     db_message = conversations_repository.create_message(
         db, 
-        message, 
         conversation.id, 
-        user_id_from=current_user.id,
-        user_id_to=lawyer_user_id,
-        from_lawyer=False
+        current_user.id,
+        message.content
     )
     
-    # Track message sent event
-    event_data = MessageEventCreate(
-        lawyer_id=lawyer_id,
-        user_id=current_user.id,
-        status="sent",
-        timestamp=datetime.now()
+    return MessageResponse(
+        id=db_message.id,
+        conversation_id=db_message.conversation_id,
+        sender_id=db_message.sender_id,
+        content=db_message.content,
+        is_from_me=True,
+        read=db_message.read,
+        timestamp=db_message.timestamp
     )
-    analytics_repository.create_message_event(db, event_data)
-    
-    return {
-        "id": str(db_message.id),
-        "conversation_id": str(conversation.id),
-        "content": db_message.content,
-        "timestamp": db_message.timestamp,
-        "success": True
-    }
 
 @router.post("/{conversation_id}/read", response_model=SuccessResponse)
 async def mark_conversation_as_read_endpoint(
